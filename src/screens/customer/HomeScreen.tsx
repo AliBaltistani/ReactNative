@@ -1,111 +1,183 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    StatusBar,
+    TextInput,
+    Image,
+    Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
 import { t } from '../../i18n';
-import { CATEGORIES, SHOPS } from '../../data/mockData';
-import CategoryCard from '../../components/CategoryCard';
-import ShopCard from '../../components/ShopCard';
+import LoadingSkeleton, { ShopCardSkeleton, CategoryCardSkeleton } from '../../components/LoadingSkeleton';
+
+import { useAuthStore } from '../../store/authStore';
+import { shopService } from '../../services/shopService';
+import type { Category, Shop } from '../../types';
 
 interface HomeScreenProps {
     navigation: any;
 }
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
+    const user = useAuthStore((s) => s.user);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [shops, setShops] = useState<Shop[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const loadData = async () => {
+        setIsLoading(true);
+        try {
+            const [cats, shopsList] = await Promise.all([
+                shopService.getCategories(),
+                shopService.getShops()
+            ]);
+            setCategories(cats);
+            setShops(shopsList);
+        } catch (error) {
+            console.error('Failed to load home data', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleSearch = async () => {
+        if (!searchQuery.trim()) {
+            loadData();
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const results = await shopService.searchShops(searchQuery);
+            setShops(results);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
-
             {/* Header */}
-            <LinearGradient colors={Colors.gradientPrimary} style={styles.header}>
+            <View style={styles.header}>
                 <View style={styles.headerTop}>
                     <View>
-                        <Text style={styles.location}>📍 Skardu</Text>
+                        <Text style={styles.greeting}>
+                            {t('home.greeting')} {user?.name.split(' ')[0] || 'Guest'} 👋
+                        </Text>
+                        <Text style={styles.location}>📍 Skardu, Pakistan</Text>
                     </View>
-                    <View style={styles.headerActions}>
-                        <TouchableOpacity style={styles.headerBtn}>
-                            <Text style={styles.headerBtnIcon}>🔔</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <Image
+                        source={{ uri: 'https://i.pravatar.cc/100?img=3' }}
+                        style={styles.avatar}
+                    />
                 </View>
 
-                <View style={styles.greeting}>
-                    <Text style={styles.greetingText}>{t('greeting.hello')}</Text>
-                    <Text style={styles.greetingSubtext}>{t('greeting.whatToOrder')}</Text>
-                </View>
-
-                {/* Search Bar */}
-                <TouchableOpacity
-                    style={styles.searchBar}
-                    onPress={() => navigation.navigate('Search')}
-                >
+                {/* Search */}
+                <View style={styles.searchBar}>
                     <Text style={styles.searchIcon}>🔍</Text>
-                    <Text style={styles.searchPlaceholder}>{t('common.search')}</Text>
-                </TouchableOpacity>
-            </LinearGradient>
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder={t('home.searchPlaceholder')}
+                        placeholderTextColor={Colors.slate}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        onSubmitEditing={handleSearch}
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => { setSearchQuery(''); loadData(); }}>
+                            <Text style={styles.clearIcon}>✖️</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
 
             <ScrollView
                 style={styles.body}
-                showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.bodyContent}
+                showsVerticalScrollIndicator={false}
             >
-                {/* Categories Grid */}
-                <View style={styles.categoriesWrap}>
-                    {CATEGORIES.map((cat) => (
-                        <CategoryCard
-                            key={cat.id}
-                            category={cat}
-                            onPress={() =>
-                                navigation.navigate('ShopList', { categoryId: cat.id, categoryName: cat.name })
-                            }
-                        />
-                    ))}
+                {/* Categories */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>{t('home.categories')}</Text>
+                    <TouchableOpacity>
+                        <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.categoriesGrid}>
+                    {isLoading ? (
+                        <>
+                            <CategoryCardSkeleton />
+                            <CategoryCardSkeleton />
+                            <CategoryCardSkeleton />
+                            <CategoryCardSkeleton />
+                        </>
+                    ) : (
+                        categories.map((cat) => (
+                            <TouchableOpacity
+                                key={cat.id}
+                                style={[styles.categoryCard, { backgroundColor: cat.color + '15' }]}
+                            >
+                                <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                                <Text style={styles.categoryName} numberOfLines={1}>
+                                    {cat.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))
+                    )}
                 </View>
 
                 {/* Nearby Shops */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>🏪 {t('home.nearbyShops')}</Text>
-                        <TouchableOpacity>
-                            <Text style={styles.viewAll}>{t('home.viewAll')}</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {SHOPS.filter((s) => s.isOpen).map((shop) => (
-                        <ShopCard
-                            key={shop.id}
-                            shop={shop}
-                            onPress={() => navigation.navigate('Shop', { shopId: shop.id })}
-                        />
-                    ))}
+                <View style={[styles.sectionHeader, { marginTop: Spacing.xl }]}>
+                    <Text style={styles.sectionTitle}>{t('home.nearbyShops')}</Text>
                 </View>
 
-                {/* Become a Rider CTA */}
-                <TouchableOpacity
-                    style={styles.riderCta}
-                    onPress={() => navigation.navigate('ProfileTab', { screen: 'Profile' })}
-                >
-                    <LinearGradient
-                        colors={Colors.gradientWarm}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.riderCtaGradient}
-                    >
-                        <Text style={styles.riderCtaEmoji}>🏍️</Text>
-                        <View style={styles.riderCtaBody}>
-                            <Text style={styles.riderCtaTitle}>{t('rider.becomeRider')}</Text>
-                            <Text style={styles.riderCtaSubtitle}>{t('rider.riderApply')}</Text>
+                <View style={styles.shopsList}>
+                    {isLoading ? (
+                        <>
+                            <ShopCardSkeleton />
+                            <ShopCardSkeleton />
+                            <ShopCardSkeleton />
+                        </>
+                    ) : shops.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <Text style={styles.emptyTitle}>No shops found</Text>
+                            <Text style={styles.emptyDesc}>Try a different search term</Text>
                         </View>
-                        <Text style={styles.riderCtaArrow}>→</Text>
-                    </LinearGradient>
-                </TouchableOpacity>
+                    ) : (
+                        shops.map((shop) => (
+                            <TouchableOpacity
+                                key={shop.id}
+                                style={styles.shopCard}
+                                onPress={() => navigation.navigate('Shop', { shopId: shop.id })}
+                            >
+                                <Image source={{ uri: shop.image }} style={styles.shopImg} />
+                                <View style={styles.shopInfo}>
+                                    <View>
+                                        <Text style={styles.shopName} numberOfLines={1}>
+                                            {shop.name}
+                                        </Text>
+                                        <Text style={styles.shopNameUr}>{shop.nameUr}</Text>
+                                    </View>
+                                    <View style={styles.shopMeta}>
+                                        <Text style={styles.metaText}>⭐ {shop.rating}</Text>
+                                        <Text style={styles.metaDot}>•</Text>
+                                        <Text style={styles.metaText}>📍 {shop.distance}</Text>
+                                        <Text style={styles.metaDot}>•</Text>
+                                        <Text style={styles.metaText}>🕐 {shop.deliveryTime}m</Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        ))
+                    )}
+                </View>
             </ScrollView>
         </View>
     );
@@ -117,82 +189,63 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.snow,
     },
     header: {
-        paddingTop: 50,
-        paddingBottom: Spacing.xl,
+        backgroundColor: Colors.white,
+        paddingTop: Platform.OS === 'ios' ? 60 : 40,
         paddingHorizontal: Spacing.xl,
-        borderBottomLeftRadius: Radius.xxl,
-        borderBottomRightRadius: Radius.xxl,
+        paddingBottom: Spacing.lg,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.ghost,
     },
     headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: Spacing.md,
-    },
-    location: {
-        ...Typography.label,
-        color: 'rgba(255,255,255,0.9)',
-        fontSize: 15,
-    },
-    headerActions: {
-        flexDirection: 'row',
-        gap: Spacing.sm,
-    },
-    headerBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerBtnIcon: {
-        fontSize: 18,
-    },
-    greeting: {
         marginBottom: Spacing.lg,
     },
-    greetingText: {
-        ...Typography.h2,
-        color: Colors.white,
+    greeting: {
+        ...Typography.caption,
+        color: Colors.gray,
+        marginBottom: 2,
     },
-    greetingSubtext: {
-        ...Typography.body,
-        color: 'rgba(255,255,255,0.8)',
-        marginTop: 2,
+    location: {
+        ...Typography.h3,
+        color: Colors.dark,
+    },
+    avatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: Colors.ghost,
     },
     searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.95)',
-        paddingHorizontal: Spacing.base,
-        paddingVertical: Spacing.md,
-        borderRadius: Radius.xl,
+        backgroundColor: Colors.ghost,
+        borderRadius: Radius.lg,
+        paddingHorizontal: Spacing.md,
+        height: 48,
     },
     searchIcon: {
         fontSize: 18,
         marginRight: Spacing.sm,
     },
-    searchPlaceholder: {
+    searchInput: {
+        flex: 1,
         ...Typography.body,
-        color: Colors.slate,
+        color: Colors.dark,
+        height: '100%',
+    },
+    clearIcon: {
+        fontSize: 16,
+        color: Colors.gray,
+        padding: 4,
     },
     body: {
         flex: 1,
     },
     bodyContent: {
-        paddingHorizontal: Spacing.xl,
-        paddingTop: Spacing.xl,
+        padding: Spacing.xl,
         paddingBottom: 100,
-    },
-    categoriesWrap: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        marginBottom: Spacing.lg,
-    },
-    section: {
-        marginBottom: Spacing.xl,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -202,45 +255,92 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         ...Typography.h3,
+        color: Colors.charcoal,
+    },
+    seeAll: {
+        ...Typography.labelSmall,
+        color: Colors.primary,
+    },
+    categoriesGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+    categoryCard: {
+        width: '47%',
+        padding: Spacing.base,
+        borderRadius: Radius.lg,
+        alignItems: 'center',
+        marginBottom: Spacing.md,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.03)',
+    },
+    categoryIcon: {
+        fontSize: 32,
+        marginBottom: Spacing.sm,
+    },
+    categoryName: {
+        ...Typography.label,
         color: Colors.dark,
     },
-    viewAll: {
-        ...Typography.label,
-        color: Colors.accent,
+    shopsList: {
+        gap: Spacing.md,
     },
-    riderCta: {
-        marginBottom: Spacing.xl,
+    shopCard: {
+        flexDirection: 'row',
+        backgroundColor: Colors.white,
         borderRadius: Radius.lg,
-        overflow: 'hidden',
-        shadowColor: Colors.warm,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 6,
+        padding: Spacing.sm,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    riderCtaGradient: {
+    shopImg: {
+        width: 80,
+        height: 80,
+        borderRadius: Radius.md,
+        backgroundColor: Colors.mist,
+    },
+    shopInfo: {
+        flex: 1,
+        marginLeft: Spacing.md,
+        justifyContent: 'space-between',
+        paddingVertical: 2,
+    },
+    shopName: {
+        ...Typography.label,
+        color: Colors.dark,
+    },
+    shopNameUr: {
+        ...Typography.caption,
+        color: Colors.gray,
+        marginTop: 1,
+    },
+    shopMeta: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: Spacing.lg,
     },
-    riderCtaEmoji: {
-        fontSize: 36,
-        marginRight: Spacing.md,
+    metaText: {
+        ...Typography.caption,
+        color: Colors.slate,
     },
-    riderCtaBody: {
-        flex: 1,
+    metaDot: {
+        color: Colors.silver,
+        marginHorizontal: 4,
     },
-    riderCtaTitle: {
+    emptyState: {
+        padding: Spacing.xxl,
+        alignItems: 'center',
+    },
+    emptyTitle: {
         ...Typography.h3,
-        color: Colors.white,
+        color: Colors.dark,
+        marginBottom: 4,
     },
-    riderCtaSubtitle: {
+    emptyDesc: {
         ...Typography.bodySmall,
-        color: 'rgba(255,255,255,0.85)',
-        marginTop: 2,
-    },
-    riderCtaArrow: {
-        fontSize: 24,
-        color: Colors.white,
-    },
+        color: Colors.gray,
+    }
 });

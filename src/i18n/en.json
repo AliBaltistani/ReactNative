@@ -11,6 +11,7 @@
         "done": "Done",
         "search": "Search...",
         "noResults": "Nothing found",
+        "seeAll": "See All",
         "retry": "Try Again",
         "yes": "Yes",
         "no": "No",
@@ -22,6 +23,17 @@
         "whatToOrder": "Kya mangwana hai?"
     },
     "auth": {
+        "enterDetails": "Enter Your Details",
+        "personal": "Personal",
+        "family": "Family",
+        "guest": "Guest",
+        "name": "Name",
+        "phone": "Phone Number",
+        "familyPin": "Family PIN",
+        "familyPinHint": "Ask your family creator for the PIN",
+        "guestHint": "Order without creating an account",
+        "continueGuest": "Continue as Guest",
+        "continue": "Continue",
         "getStarted": "Get Started",
         "personalAccount": "Personal Account",
         "familyAccount": "Family Account",
@@ -48,6 +60,9 @@
         "electronics": "Electronics"
     },
     "home": {
+        "greeting": "Assalam o Alaikum! 👋",
+        "searchPlaceholder": "Search for products...",
+        "categories": "Categories",
         "nearbyShops": "Nearby Shops",
         "popular": "Popular",
         "viewAll": "View All",

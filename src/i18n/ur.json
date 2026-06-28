@@ -11,6 +11,7 @@
         "done": "ہو گیا",
         "search": "تلاش کریں...",
         "noResults": "کچھ نہیں ملا",
+        "seeAll": "سب دیکھیں",
         "retry": "دوبارہ کوشش",
         "yes": "ہاں",
         "no": "نہیں",
@@ -22,6 +23,17 @@
         "whatToOrder": "کیا منگوانا ہے؟"
     },
     "auth": {
+        "enterDetails": "اپنی تفصیلات درج کریں",
+        "personal": "ذاتی",
+        "family": "فیملی",
+        "guest": "مہمان",
+        "name": "نام",
+        "phone": "فون نمبر",
+        "familyPin": "فیملی پن",
+        "familyPinHint": "اپنی فیملی سے پن کے لیے پوچھیں",
+        "guestHint": "اکاؤنٹ بنائے بغیر آرڈر کریں",
+        "continueGuest": "بطور مہمان جاری رکھیں",
+        "continue": "جاری رکھیں",
         "getStarted": "شروع کریں",
         "personalAccount": "اپنا اکاؤنٹ",
         "familyAccount": "فیملی اکاؤنٹ",
@@ -48,6 +60,9 @@
         "electronics": "الیکٹرانکس"
     },
     "home": {
+        "greeting": "!السلام و علیکم 👋",
+        "searchPlaceholder": "کیا منگوانا ہے؟",
+        "categories": "اقسام",
         "nearbyShops": "قریبی دکانیں",
         "popular": "مقبول",
         "viewAll": "سب دیکھیں",

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -6,11 +6,12 @@ import {
     ScrollView,
     TouchableOpacity,
     Switch,
+    ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
-import { t } from '../../i18n';
-import { MOCK_SELLER_STATS, MOCK_SELLER_ORDERS } from '../../data/mockData';
+import Toast from '../../components/Toast';
+import { sellerService } from '../../services/sellerService';
+import type { SellerOrder, SellerStats } from '../../types';
 
 interface SellerDashboardProps {
     navigation: any;
@@ -18,291 +19,183 @@ interface SellerDashboardProps {
 
 export default function SellerDashboard({ navigation }: SellerDashboardProps) {
     const [isOpen, setIsOpen] = useState(true);
-    const stats = MOCK_SELLER_STATS;
-    const orders = MOCK_SELLER_ORDERS;
+    const [stats, setStats] = useState<SellerStats | null>(null);
+    const [orders, setOrders] = useState<SellerOrder[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [toast, setToast] = useState('');
 
-    const getStatusStyle = (status: string) => {
-        switch (status) {
-            case 'new': return { bg: Colors.warmFaded, color: Colors.warm, label: '🔔 New' };
-            case 'accepted': return { bg: Colors.accentFaded, color: Colors.accent, label: '✅ Accepted' };
-            case 'preparing': return { bg: Colors.primaryFaded, color: Colors.primary, label: '👨‍🍳 Preparing' };
-            case 'ready': return { bg: Colors.successFaded, color: Colors.success, label: '📦 Ready' };
-            default: return { bg: Colors.ghost, color: Colors.gray, label: status };
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    const loadData = async () => {
+        setIsLoading(true);
+        try {
+            const [statsData, ordersData] = await Promise.all([
+                sellerService.getSellerStats(),
+                sellerService.getSellerOrders()
+            ]);
+            setStats(statsData);
+            setOrders(ordersData);
+        } finally {
+            setIsLoading(false);
         }
     };
 
+    const toggleOpen = async () => {
+        const temp = !isOpen;
+        setIsOpen(temp);
+        const success = await sellerService.toggleShopOpen(temp);
+        if (!success) {
+            setIsOpen(!temp); // revert
+            setToast('Failed to change shop status');
+        }
+    };
+
+    const handleAccept = async (orderId: string) => {
+        await sellerService.acceptOrder(orderId);
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'preparing' } : o));
+        setToast('Order accepted for preparation');
+    };
+
+    const handleReady = async (orderId: string) => {
+        await sellerService.updateOrderStatus(orderId, 'ready');
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'ready' } : o));
+        setToast('Order accepted for preparation');
+    };
+
+    const activeOrders = orders.filter(o => ['new', 'preparing'].includes(o.status));
+
+    if (isLoading || !stats) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <LinearGradient colors={Colors.gradientWarm} style={styles.header}>
-                <Text style={styles.headerTitle}>🏪 Abdul&apos;s Karyana</Text>
-                <View style={styles.shopToggle}>
-                    <Text style={styles.shopStatus}>
-                        {isOpen ? t('seller.shopOpen') : t('seller.shopClosed')}
+            <Toast visible={!!toast} message={toast} type="success" onHide={() => setToast('')} />
+
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.greeting}>Seller Dashboard 🏪</Text>
+                    <Text style={styles.statusText}>
+                        Shop is <Text style={isOpen ? styles.online : styles.offline}>
+                            {isOpen ? 'OPEN' : 'CLOSED'}
+                        </Text>
                     </Text>
-                    <Switch
-                        value={isOpen}
-                        onValueChange={setIsOpen}
-                        trackColor={{ false: 'rgba(255,255,255,0.3)', true: 'rgba(255,255,255,0.5)' }}
-                        thumbColor={Colors.white}
-                    />
                 </View>
-            </LinearGradient>
+                <Switch
+                    value={isOpen}
+                    onValueChange={toggleOpen}
+                    trackColor={{ false: Colors.mist, true: Colors.primary + '60' }}
+                    thumbColor={isOpen ? Colors.primary : Colors.silver}
+                />
+            </View>
 
             <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                {/* Stats Row */}
-                <View style={styles.statsRow}>
-                    <View style={[styles.statCard, { borderLeftColor: Colors.accent }]}>
-                        <Text style={styles.statIcon}>📦</Text>
+                {/* Stats */}
+                <View style={styles.statsGrid}>
+                    <View style={styles.statCard}>
+                        <Text style={styles.statValue}>{stats.pendingOrders}</Text>
+                        <Text style={styles.statLabel}>Pending</Text>
+                    </View>
+                    <View style={styles.statCard}>
                         <Text style={styles.statValue}>{stats.todayOrders}</Text>
-                        <Text style={styles.statLabel}>{t('seller.orders')}</Text>
+                        <Text style={styles.statLabel}>Total Today</Text>
                     </View>
-                    <View style={[styles.statCard, { borderLeftColor: Colors.primary }]}>
-                        <Text style={styles.statIcon}>💰</Text>
-                        <Text style={styles.statValue}>{stats.todaySales.toLocaleString()}</Text>
-                        <Text style={styles.statLabel}>{t('seller.sales')}</Text>
-                    </View>
-                    <View style={[styles.statCard, { borderLeftColor: Colors.warm }]}>
-                        <Text style={styles.statIcon}>⭐</Text>
-                        <Text style={styles.statValue}>{stats.rating}</Text>
-                        <Text style={styles.statLabel}>Rating</Text>
+                    <View style={styles.statCard}>
+                        <Text style={styles.statValue}>PKR {stats.todaySales}</Text>
+                        <Text style={styles.statLabel}>Revenue</Text>
                     </View>
                 </View>
 
-                {/* Active Orders */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📋 Active Orders</Text>
+                {/* Orders Queue */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Live Orders Queue ({activeOrders.length})</Text>
+                </View>
 
-                    {orders.map((order) => {
-                        const status = getStatusStyle(order.status);
-                        return (
-                            <View key={order.id} style={styles.orderCard}>
-                                <View style={styles.orderHeader}>
-                                    <Text style={styles.orderId}>{order.id}</Text>
-                                    <View style={[styles.statusTag, { backgroundColor: status.bg }]}>
-                                        <Text style={[styles.statusText, { color: status.color }]}>
-                                            {status.label}
-                                        </Text>
-                                    </View>
+                {activeOrders.length === 0 ? (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyIcon}>☕</Text>
+                        <Text style={styles.emptyTitle}>All caught up</Text>
+                        <Text style={styles.emptyLabel}>No active orders at the moment.</Text>
+                    </View>
+                ) : (
+                    activeOrders.map(order => (
+                        <View key={order.id} style={styles.orderCard}>
+                            <View style={styles.orderHeader}>
+                                <View style={styles.orderIdBadge}>
+                                    <Text style={styles.orderIdText}>{order.id}</Text>
                                 </View>
+                                <Text style={styles.orderTime}>{new Date(order.createdAt).toLocaleTimeString()}</Text>
+                            </View>
 
-                                {order.items.map((item, i) => (
-                                    <Text key={i} style={styles.orderItem}>
-                                        {item.name} × {item.quantity} — PKR {(item.price * item.quantity).toLocaleString()}
+                            <View style={styles.orderItems}>
+                                {order.items.map((item, idx) => (
+                                    <Text key={idx} style={styles.itemRow}>
+                                        <Text style={styles.itemQty}>{item.quantity}x </Text>
+                                        <Text style={styles.itemName}>{item.name}</Text>
                                     </Text>
                                 ))}
+                            </View>
 
-                                <View style={styles.orderFooter}>
-                                    <Text style={styles.orderTotal}>PKR {order.total.toLocaleString()}</Text>
-                                    <Text style={styles.orderTime}>{order.createdAt}</Text>
-                                </View>
+                            <View style={styles.orderFooter}>
+                                <Text style={styles.orderTotal}>Total: PKR {order.total}</Text>
 
                                 {order.status === 'new' && (
-                                    <View style={styles.orderActions}>
-                                        <TouchableOpacity style={styles.acceptBtn}>
-                                            <Text style={styles.acceptBtnText}>✅ {t('seller.acceptOrder')}</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={styles.rejectBtn}>
-                                            <Text style={styles.rejectBtnText}>❌ {t('seller.rejectOrder')}</Text>
-                                        </TouchableOpacity>
-                                    </View>
+                                    <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAccept(order.id)}>
+                                        <Text style={styles.acceptBtnText}>Accept & Prepare</Text>
+                                    </TouchableOpacity>
                                 )}
 
                                 {order.status === 'preparing' && (
-                                    <TouchableOpacity style={styles.readyBtn}>
-                                        <Text style={styles.readyBtnText}>📦 {t('seller.ready')}</Text>
+                                    <TouchableOpacity style={styles.readyBtn} onPress={() => handleReady(order.id)}>
+                                        <Text style={styles.readyBtnText}>Mark as Ready</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
-                        );
-                    })}
-                </View>
-
-                {/* Add Item */}
-                <TouchableOpacity style={styles.addItemBtn}>
-                    <Text style={styles.addItemIcon}>➕</Text>
-                    <Text style={styles.addItemText}>{t('seller.addItem')}</Text>
-                </TouchableOpacity>
+                        </View>
+                    ))
+                )}
             </ScrollView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: Colors.snow,
-    },
-    header: {
-        paddingTop: 54,
-        paddingBottom: Spacing.lg,
-        paddingHorizontal: Spacing.xl,
-    },
-    headerTitle: {
-        ...Typography.h2,
-        color: Colors.white,
-        marginBottom: Spacing.sm,
-    },
-    shopToggle: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.sm,
-    },
-    shopStatus: {
-        ...Typography.label,
-        color: 'rgba(255,255,255,0.9)',
-    },
-    body: {
-        padding: Spacing.xl,
-        paddingBottom: 100,
-    },
-    statsRow: {
-        flexDirection: 'row',
-        gap: Spacing.md,
-        marginBottom: Spacing.xl,
-    },
-    statCard: {
-        flex: 1,
-        backgroundColor: Colors.white,
-        padding: Spacing.md,
-        borderRadius: Radius.md,
-        alignItems: 'center',
-        borderLeftWidth: 3,
-        shadowColor: Colors.cardShadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    statIcon: {
-        fontSize: 20,
-        marginBottom: 4,
-    },
-    statValue: {
-        ...Typography.h3,
-        color: Colors.dark,
-    },
-    statLabel: {
-        ...Typography.caption,
-        color: Colors.slate,
-        marginTop: 2,
-    },
-    section: {
-        marginBottom: Spacing.xl,
-    },
-    sectionTitle: {
-        ...Typography.h3,
-        color: Colors.dark,
-        marginBottom: Spacing.md,
-    },
-    orderCard: {
-        backgroundColor: Colors.white,
-        padding: Spacing.base,
-        borderRadius: Radius.lg,
-        marginBottom: Spacing.md,
-        shadowColor: Colors.cardShadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    orderHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: Spacing.sm,
-    },
-    orderId: {
-        ...Typography.label,
-        color: Colors.dark,
-    },
-    statusTag: {
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.xs,
-        borderRadius: Radius.full,
-    },
-    statusText: {
-        ...Typography.labelSmall,
-    },
-    orderItem: {
-        ...Typography.bodySmall,
-        color: Colors.gray,
-        marginBottom: 2,
-    },
-    orderFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: Colors.ghost,
-        paddingTop: Spacing.sm,
-        marginTop: Spacing.sm,
-    },
-    orderTotal: {
-        ...Typography.price,
-        color: Colors.primary,
-    },
-    orderTime: {
-        ...Typography.caption,
-        color: Colors.slate,
-    },
-    orderActions: {
-        flexDirection: 'row',
-        gap: Spacing.md,
-        marginTop: Spacing.md,
-    },
-    acceptBtn: {
-        flex: 1,
-        backgroundColor: Colors.primary,
-        paddingVertical: Spacing.sm,
-        borderRadius: Radius.md,
-        alignItems: 'center',
-    },
-    acceptBtnText: {
-        ...Typography.label,
-        color: Colors.white,
-    },
-    rejectBtn: {
-        flex: 1,
-        backgroundColor: Colors.dangerFaded,
-        paddingVertical: Spacing.sm,
-        borderRadius: Radius.md,
-        alignItems: 'center',
-    },
-    rejectBtnText: {
-        ...Typography.label,
-        color: Colors.danger,
-    },
-    readyBtn: {
-        backgroundColor: Colors.successFaded,
-        paddingVertical: Spacing.sm,
-        borderRadius: Radius.md,
-        alignItems: 'center',
-        marginTop: Spacing.md,
-        borderWidth: 1,
-        borderColor: Colors.success,
-    },
-    readyBtnText: {
-        ...Typography.label,
-        color: Colors.success,
-    },
-    addItemBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: Colors.white,
-        padding: Spacing.lg,
-        borderRadius: Radius.lg,
-        borderWidth: 2,
-        borderColor: Colors.mist,
-        borderStyle: 'dashed',
-        gap: Spacing.sm,
-    },
-    addItemIcon: {
-        fontSize: 24,
-    },
-    addItemText: {
-        ...Typography.label,
-        color: Colors.gray,
-    },
+    container: { flex: 1, backgroundColor: Colors.snow },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 60, paddingBottom: Spacing.md, paddingHorizontal: Spacing.xl, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.ghost },
+    greeting: { ...Typography.h2, color: Colors.dark },
+    statusText: { ...Typography.label, marginTop: 4, color: Colors.gray },
+    online: { color: Colors.primary, fontWeight: 'bold' },
+    offline: { color: Colors.danger, fontWeight: 'bold' },
+    body: { padding: Spacing.xl, paddingBottom: 100 },
+    statsGrid: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xxl },
+    statCard: { flex: 1, backgroundColor: Colors.white, padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.mist, alignItems: 'center' },
+    statValue: { ...Typography.h3, color: Colors.dark },
+    statLabel: { ...Typography.caption, color: Colors.gray, marginTop: 4 },
+    sectionHeader: { marginBottom: Spacing.lg },
+    sectionTitle: { ...Typography.h3, color: Colors.charcoal },
+    emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, backgroundColor: Colors.white, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.mist },
+    emptyIcon: { fontSize: 48, marginBottom: Spacing.md },
+    emptyTitle: { ...Typography.label, color: Colors.dark },
+    emptyLabel: { ...Typography.caption, color: Colors.gray, marginTop: 4 },
+    orderCard: { backgroundColor: Colors.white, borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.md, borderWidth: 2, borderColor: Colors.primaryFaded, shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
+    orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md, paddingBottom: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.ghost },
+    orderIdBadge: { backgroundColor: Colors.dark, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm },
+    orderIdText: { ...Typography.labelSmall, color: Colors.white },
+    orderTime: { ...Typography.caption, color: Colors.danger, fontWeight: 'bold' },
+    orderItems: { marginBottom: Spacing.md },
+    itemRow: { marginBottom: 4 },
+    itemQty: { ...Typography.label, color: Colors.primary },
+    itemName: { ...Typography.body, color: Colors.dark },
+    orderFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.ghost },
+    orderTotal: { ...Typography.label, color: Colors.charcoal },
+    acceptBtn: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: Radius.md },
+    acceptBtnText: { ...Typography.button, color: Colors.white },
+    readyBtn: { backgroundColor: Colors.accent, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: Radius.md },
+    readyBtnText: { ...Typography.button, color: Colors.white },
 });

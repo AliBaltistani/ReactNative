@@ -8,140 +8,180 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    ActivityIndicator,
 } from 'react-native';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
 import { t } from '../../i18n';
+import { useAuthStore } from '../../store/authStore';
+import { authService } from '../../services/authService';
 
 interface LoginScreenProps {
     navigation: any;
 }
 
 export default function LoginScreen({ navigation }: LoginScreenProps) {
-    const [mode, setMode] = useState<'select' | 'personal' | 'family' | 'guest'>('select');
+    const [mode, setMode] = useState<'personal' | 'family' | 'guest'>('personal');
     const [phone, setPhone] = useState('');
-    const [pin, setPin] = useState('');
+    const [name, setName] = useState('');
+    const [familyPin, setFamilyPin] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
 
-    const handleContinue = () => {
-        // For MVP: just navigate to main app
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'CustomerTabs' }],
-        });
+    const { login, setGuest } = useAuthStore();
+
+    const handleContinue = async () => {
+        setError('');
+
+        if (mode === 'guest') {
+            setGuest();
+            navigation.reset({ index: 0, routes: [{ name: 'CustomerTabs' }] });
+            return;
+        }
+
+        if (!phone.trim()) {
+            setError('Phone number is required');
+            return;
+        }
+
+        if (mode === 'family' && familyPin.length < 4) {
+            setError('Family PIN must be 4 digits');
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            if (mode === 'family') {
+                const result = await authService.loginWithPhone(phone, familyPin);
+                login({ ...result.user, isFamilyAccount: true, familyPin }, result.token);
+            } else {
+                const result = await authService.register({
+                    name: name || 'User',
+                    phone,
+                });
+                login(result.user, result.token);
+            }
+            navigation.reset({ index: 0, routes: [{ name: 'CustomerTabs' }] });
+        } catch {
+            setError('Login failed. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
-
-    if (mode === 'select') {
-        return (
-            <View style={styles.container}>
-                <View style={styles.header}>
-                    <Text style={styles.logo}>🏔️ RasaanGo</Text>
-                    <Text style={styles.subtitle}>{t('common.tagline')}</Text>
-                </View>
-
-                <View style={styles.options}>
-                    <TouchableOpacity
-                        style={styles.optionCard}
-                        onPress={() => setMode('personal')}
-                    >
-                        <Text style={styles.optionIcon}>👤</Text>
-                        <View style={styles.optionBody}>
-                            <Text style={styles.optionTitle}>{t('auth.personalAccount')}</Text>
-                            <Text style={styles.optionDesc}>{t('auth.loginSubtitle')}</Text>
-                        </View>
-                        <Text style={styles.arrow}>→</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.optionCard, styles.familyCard]}
-                        onPress={() => setMode('family')}
-                    >
-                        <Text style={styles.optionIcon}>👨‍👩‍👧</Text>
-                        <View style={styles.optionBody}>
-                            <Text style={styles.optionTitle}>{t('auth.familyAccount')}</Text>
-                            <Text style={styles.optionDesc}>{t('auth.familySubtitle')}</Text>
-                        </View>
-                        <Text style={styles.arrow}>→</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.optionCard, styles.guestCard]}
-                        onPress={handleContinue}
-                    >
-                        <Text style={styles.optionIcon}>👻</Text>
-                        <View style={styles.optionBody}>
-                            <Text style={styles.optionTitle}>{t('auth.guestMode')}</Text>
-                            <Text style={styles.optionDesc}>{t('auth.guestSubtitle')}</Text>
-                        </View>
-                        <Text style={styles.arrow}>→</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        );
-    }
 
     return (
         <KeyboardAvoidingView
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            <ScrollView contentContainerStyle={styles.formContainer}>
-                <TouchableOpacity onPress={() => setMode('select')} style={styles.backBtn}>
-                    <Text style={styles.backText}>← {t('common.back')}</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.formTitle}>
-                    {mode === 'family' ? '👨‍👩‍👧' : '👤'}{' '}
-                    {mode === 'family' ? t('auth.familyAccount') : t('auth.personalAccount')}
-                </Text>
-
-                {/* Phone Input */}
-                <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>{t('auth.enterPhone')}</Text>
-                    <View style={styles.phoneRow}>
-                        <View style={styles.countryCode}>
-                            <Text style={styles.countryCodeText}>🇵🇰 +92</Text>
-                        </View>
-                        <TextInput
-                            style={styles.phoneInput}
-                            placeholder="3XX XXXXXXX"
-                            placeholderTextColor={Colors.silver}
-                            value={phone}
-                            onChangeText={setPhone}
-                            keyboardType="phone-pad"
-                            maxLength={10}
-                        />
-                    </View>
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                    <Text style={styles.headerEmoji}>🏔️</Text>
+                    <Text style={styles.headerTitle}>RasaanGo</Text>
+                    <Text style={styles.headerSubtitle}>{t('auth.enterDetails')}</Text>
                 </View>
 
-                {/* Family PIN */}
-                {mode === 'family' && (
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>{t('auth.createPin')}</Text>
-                        <TextInput
-                            style={styles.pinInput}
-                            placeholder="● ● ● ●"
-                            placeholderTextColor={Colors.silver}
-                            value={pin}
-                            onChangeText={setPin}
-                            keyboardType="number-pad"
-                            maxLength={4}
-                            secureTextEntry
-                        />
-                        <Text style={styles.pinHint}>
-                            🔒 Family members will use this PIN to access
-                        </Text>
+                {/* Mode Selector */}
+                <View style={styles.modeRow}>
+                    {(['personal', 'family', 'guest'] as const).map((m) => (
+                        <TouchableOpacity
+                            key={m}
+                            style={[styles.modeBtn, mode === m && styles.modeBtnActive]}
+                            onPress={() => { setMode(m); setError(''); }}
+                        >
+                            <Text style={styles.modeIcon}>
+                                {m === 'personal' ? '👤' : m === 'family' ? '👨‍👩‍👧' : '👻'}
+                            </Text>
+                            <Text style={[styles.modeLabel, mode === m && styles.modeLabelActive]}>
+                                {m === 'personal'
+                                    ? t('auth.personal')
+                                    : m === 'family'
+                                        ? t('auth.family')
+                                        : t('auth.guest')}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                {/* Form */}
+                {mode !== 'guest' && (
+                    <View style={styles.form}>
+                        {mode === 'personal' && (
+                            <View style={styles.inputWrap}>
+                                <Text style={styles.inputLabel}>👤 {t('auth.name')}</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Your name"
+                                    placeholderTextColor={Colors.slate}
+                                    value={name}
+                                    onChangeText={setName}
+                                />
+                            </View>
+                        )}
+
+                        <View style={styles.inputWrap}>
+                            <Text style={styles.inputLabel}>📞 {t('auth.phone')}</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="03XX XXXXXXX"
+                                placeholderTextColor={Colors.slate}
+                                value={phone}
+                                onChangeText={setPhone}
+                                keyboardType="phone-pad"
+                            />
+                        </View>
+
+                        {mode === 'family' && (
+                            <View style={styles.inputWrap}>
+                                <Text style={styles.inputLabel}>🔢 {t('auth.familyPin')}</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="4-digit PIN"
+                                    placeholderTextColor={Colors.slate}
+                                    value={familyPin}
+                                    onChangeText={setFamilyPin}
+                                    maxLength={4}
+                                    keyboardType="number-pad"
+                                    secureTextEntry
+                                />
+                                <Text style={styles.inputHint}>{t('auth.familyPinHint')}</Text>
+                            </View>
+                        )}
                     </View>
                 )}
 
-                {/* Privacy Notice */}
-                <View style={styles.privacyNotice}>
-                    <Text style={styles.privacyIcon}>🛡️</Text>
-                    <Text style={styles.privacyText}>
-                        Your number is only used for verification. Riders and shops will never see your personal number.
-                    </Text>
-                </View>
+                {mode === 'guest' && (
+                    <View style={styles.guestInfo}>
+                        <Text style={styles.guestIcon}>👻</Text>
+                        <Text style={styles.guestTitle}>{t('auth.guestMode')}</Text>
+                        <Text style={styles.guestText}>{t('auth.guestHint')}</Text>
+                    </View>
+                )}
 
-                <TouchableOpacity style={styles.continueBtn} onPress={handleContinue}>
-                    <Text style={styles.continueBtnText}>{t('common.next')} →</Text>
+                {/* Error */}
+                {error !== '' && (
+                    <View style={styles.errorWrap}>
+                        <Text style={styles.errorText}>⚠️ {error}</Text>
+                    </View>
+                )}
+
+                {/* Continue Button */}
+                <TouchableOpacity
+                    style={[styles.continueBtn, isLoading && styles.continueBtnDisabled]}
+                    onPress={handleContinue}
+                    disabled={isLoading}
+                >
+                    {isLoading ? (
+                        <ActivityIndicator color={Colors.white} />
+                    ) : (
+                        <Text style={styles.continueText}>
+                            {mode === 'guest' ? `👻 ${t('auth.continueGuest')}` : `→ ${t('auth.continue')}`}
+                        </Text>
+                    )}
                 </TouchableOpacity>
             </ScrollView>
         </KeyboardAvoidingView>
@@ -151,152 +191,115 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.snow,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        padding: Spacing.xl,
+        paddingTop: 60,
     },
     header: {
         alignItems: 'center',
-        paddingTop: 80,
-        paddingBottom: Spacing.xxl,
-    },
-    logo: {
-        fontSize: 36,
-        fontWeight: '800',
-        color: Colors.primary,
-        marginBottom: Spacing.sm,
-    },
-    subtitle: {
-        ...Typography.body,
-        color: Colors.gray,
-    },
-    options: {
-        paddingHorizontal: Spacing.xl,
-        gap: Spacing.md,
-    },
-    optionCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: Colors.snow,
-        padding: Spacing.lg,
-        borderRadius: Radius.lg,
-        borderWidth: 1.5,
-        borderColor: Colors.mist,
-    },
-    familyCard: {
-        borderColor: Colors.primary + '40',
-        backgroundColor: Colors.primaryFaded,
-    },
-    guestCard: {
-        borderColor: Colors.warm + '40',
-        backgroundColor: Colors.warmFaded,
-    },
-    optionIcon: {
-        fontSize: 32,
-        marginRight: Spacing.md,
-    },
-    optionBody: {
-        flex: 1,
-    },
-    optionTitle: {
-        ...Typography.h3,
-        color: Colors.dark,
-        marginBottom: 2,
-    },
-    optionDesc: {
-        ...Typography.bodySmall,
-        color: Colors.gray,
-    },
-    arrow: {
-        fontSize: 20,
-        color: Colors.slate,
-    },
-    formContainer: {
-        paddingHorizontal: Spacing.xl,
-        paddingTop: 60,
-        paddingBottom: Spacing.xxxl,
-    },
-    backBtn: {
-        marginBottom: Spacing.xl,
-    },
-    backText: {
-        ...Typography.label,
-        color: Colors.accent,
-    },
-    formTitle: {
-        ...Typography.h2,
-        color: Colors.dark,
         marginBottom: Spacing.xxl,
     },
-    inputGroup: {
+    headerEmoji: {
+        fontSize: 52,
+        marginBottom: Spacing.sm,
+    },
+    headerTitle: {
+        ...Typography.h1,
+        color: Colors.primary,
+    },
+    headerSubtitle: {
+        ...Typography.body,
+        color: Colors.gray,
+        marginTop: Spacing.xs,
+    },
+    modeRow: {
+        flexDirection: 'row',
+        gap: Spacing.sm,
+        marginBottom: Spacing.xxl,
+    },
+    modeBtn: {
+        flex: 1,
+        alignItems: 'center',
+        padding: Spacing.md,
+        borderRadius: Radius.lg,
+        borderWidth: 2,
+        borderColor: Colors.mist,
+        backgroundColor: Colors.white,
+    },
+    modeBtnActive: {
+        borderColor: Colors.primary,
+        backgroundColor: Colors.primaryFaded,
+    },
+    modeIcon: {
+        fontSize: 28,
+        marginBottom: Spacing.xs,
+    },
+    modeLabel: {
+        ...Typography.labelSmall,
+        color: Colors.gray,
+    },
+    modeLabelActive: {
+        color: Colors.primary,
+    },
+    form: {
+        gap: Spacing.lg,
         marginBottom: Spacing.xl,
+    },
+    inputWrap: {
+        // gap applied by parent
     },
     inputLabel: {
         ...Typography.label,
         color: Colors.charcoal,
         marginBottom: Spacing.sm,
     },
-    phoneRow: {
-        flexDirection: 'row',
-        gap: Spacing.sm,
-    },
-    countryCode: {
-        backgroundColor: Colors.ghost,
-        paddingHorizontal: Spacing.base,
-        paddingVertical: Spacing.md,
-        borderRadius: Radius.md,
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: Colors.mist,
-    },
-    countryCodeText: {
-        ...Typography.label,
-        color: Colors.charcoal,
-    },
-    phoneInput: {
-        flex: 1,
-        backgroundColor: Colors.snow,
-        paddingHorizontal: Spacing.base,
-        paddingVertical: Spacing.md,
-        borderRadius: Radius.md,
-        borderWidth: 1.5,
-        borderColor: Colors.mist,
-        ...Typography.bodyLarge,
-        color: Colors.dark,
-        letterSpacing: 1,
-    },
-    pinInput: {
-        backgroundColor: Colors.snow,
-        paddingHorizontal: Spacing.xl,
-        paddingVertical: Spacing.base,
-        borderRadius: Radius.md,
-        borderWidth: 1.5,
-        borderColor: Colors.mist,
-        ...Typography.h2,
-        textAlign: 'center',
-        letterSpacing: 12,
-        color: Colors.dark,
-    },
-    pinHint: {
-        ...Typography.caption,
-        color: Colors.gray,
-        marginTop: Spacing.sm,
-        textAlign: 'center',
-    },
-    privacyNotice: {
-        flexDirection: 'row',
-        backgroundColor: Colors.successFaded,
+    input: {
+        backgroundColor: Colors.white,
         padding: Spacing.base,
         borderRadius: Radius.md,
+        borderWidth: 1.5,
+        borderColor: Colors.mist,
+        ...Typography.body,
+        color: Colors.dark,
+    },
+    inputHint: {
+        ...Typography.caption,
+        color: Colors.gray,
+        marginTop: Spacing.xs,
+    },
+    guestInfo: {
+        alignItems: 'center',
+        backgroundColor: Colors.ghost,
+        padding: Spacing.xxl,
+        borderRadius: Radius.xl,
         marginBottom: Spacing.xl,
-        alignItems: 'flex-start',
     },
-    privacyIcon: {
-        fontSize: 20,
-        marginRight: Spacing.sm,
+    guestIcon: {
+        fontSize: 48,
+        marginBottom: Spacing.md,
     },
-    privacyText: {
+    guestTitle: {
+        ...Typography.h3,
+        color: Colors.dark,
+        marginBottom: Spacing.sm,
+    },
+    guestText: {
+        ...Typography.body,
+        color: Colors.gray,
+        textAlign: 'center',
+    },
+    errorWrap: {
+        backgroundColor: '#FEF2F2',
+        padding: Spacing.md,
+        borderRadius: Radius.md,
+        marginBottom: Spacing.md,
+    },
+    errorText: {
         ...Typography.bodySmall,
-        color: Colors.charcoal,
-        flex: 1,
+        color: Colors.danger,
     },
     continueBtn: {
         backgroundColor: Colors.primary,
@@ -309,7 +312,10 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
         elevation: 6,
     },
-    continueBtnText: {
+    continueBtnDisabled: {
+        opacity: 0.7,
+    },
+    continueText: {
         ...Typography.button,
         color: Colors.white,
         fontSize: 17,

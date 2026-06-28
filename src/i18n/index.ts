@@ -14,7 +14,7 @@ let currentLanguage = 'en';
  * Simple i18n helper — no external dependency needed for MVP.
  * Accesses nested keys like "auth.getStarted"
  */
-export function t(key: string): string {
+export function t(key: string, defaultValue?: string): string {
     const keys = key.split('.');
     let result: unknown = translations[currentLanguage] || translations.en;
 
@@ -28,14 +28,14 @@ export function t(key: string): string {
                 if (result && typeof result === 'object' && fallbackKey in result) {
                     result = (result as Record<string, unknown>)[fallbackKey];
                 } else {
-                    return key; // Return key if not found
+                    return defaultValue || key; // Return key if not found
                 }
             }
             break;
         }
     }
 
-    return typeof result === 'string' ? result : key;
+    return typeof result === 'string' ? result : (defaultValue || key);
 }
 
 export function setLanguage(lang: string): void {

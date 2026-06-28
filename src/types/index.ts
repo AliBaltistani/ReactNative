@@ -121,6 +121,7 @@ export interface DeliveryRequest {
 
 // Seller
 export interface SellerStats {
+    pendingOrders: number;
     todayOrders: number;
     todaySales: number;
     rating: number;

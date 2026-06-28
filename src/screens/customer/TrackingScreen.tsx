@@ -1,143 +1,193 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     TouchableOpacity,
+    ScrollView,
+    Animated,
+    Dimensions,
 } from 'react-native';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
 import { t } from '../../i18n';
+import MapView, { Marker, Polyline } from '../../components/MapView';
+import { useOrderStore } from '../../store/orderStore';
+import { orderService } from '../../services/orderService';
+import type { Order } from '../../types';
 
 interface TrackingScreenProps {
     navigation: any;
     route: any;
 }
 
-const STEPS = [
-    { key: 'confirmed', icon: '✅', label: 'tracking.confirmed' },
-    { key: 'preparing', icon: '👨‍🍳', label: 'tracking.preparing' },
-    { key: 'picked_up', icon: '📦', label: 'tracking.pickedUp' },
-    { key: 'on_the_way', icon: '🏍️', label: 'tracking.onTheWay' },
-    { key: 'delivered', icon: '🎉', label: 'tracking.delivered' },
-];
+const { height } = Dimensions.get('window');
 
 export default function TrackingScreen({ navigation, route }: TrackingScreenProps) {
-    const orderId = route.params?.orderId || '#1234';
-    const shopName = route.params?.shopName || 'Shop';
-    const total = route.params?.total || 0;
-    const isAnonymous = route.params?.isAnonymous || false;
+    const { orderId } = route.params;
+    const { orders, cancelOrder } = useOrderStore();
+    const [order, setOrder] = useState<Order | null>(null);
 
-    const [currentStep, setCurrentStep] = useState(0);
+    // Slide up animation for details sheet
+    const slideAnim = React.useRef(new Animated.Value(height * 0.4)).current;
 
-    // Simulate status progression
     useEffect(() => {
-        if (currentStep < STEPS.length - 1) {
-            const timer = setTimeout(() => setCurrentStep((s) => s + 1), 4000);
-            return () => clearTimeout(timer);
+        // Sync local order state with store (store simulates live tracking via timeouts for demo)
+        const currentOrder = orders.find((o) => o.id === orderId);
+        setOrder(currentOrder || null);
+    }, [orders, orderId]);
+
+    useEffect(() => {
+        Animated.spring(slideAnim, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: true,
+        }).start();
+    }, []);
+
+    const handleCancel = async () => {
+        const success = await orderService.cancelOrder(orderId);
+        if (success) {
+            cancelOrder(orderId);
+            navigation.goBack();
         }
-    }, [currentStep]);
+    };
+
+    if (!order) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={styles.orderId}>Order not found</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()}>
+                    <Text style={[styles.backBtn, { marginTop: 20 }]}>Go Back</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    const { status, shop, isAnonymous } = order;
+
+    // Steps configuration based on status
+    const steps = [
+        { key: 'confirmed', label: 'Confirmed', icon: '📝' },
+        { key: 'preparing', label: 'Preparing', icon: '🍳' },
+        { key: 'picked_up', label: 'Picked Up', icon: '🛍️' },
+        { key: 'on_the_way', label: 'On The Way', icon: '🛵' },
+        { key: 'delivered', label: 'Delivered', icon: '✅' },
+    ];
+
+    const currentStepIndex = steps.findIndex(s => s.key === status);
+
+    // Mock coordinates for Skardu map
+    const SKARDU_REGION = {
+        latitude: 35.2974,
+        longitude: 75.6333,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+    };
+    const shopCoord = { latitude: 35.2950, longitude: 75.6350 };
+    const deliveryCoord = { latitude: 35.3000, longitude: 75.6300 };
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.backBtn}>← {t('common.back')}</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('tracking.title')}</Text>
-                <Text style={styles.orderId}>{orderId}</Text>
+            {/* Map Background */}
+            <MapView
+                style={StyleSheet.absoluteFill}
+                initialRegion={SKARDU_REGION}
+                scrollEnabled={false}
+                zoomEnabled={false}
+            >
+                <Marker coordinate={shopCoord} title={shop.name} description="Shop" />
+                <Marker coordinate={deliveryCoord} title="Delivery" pinColor="blue" />
+                <Polyline coordinates={[shopCoord, deliveryCoord]} strokeColor={Colors.primary} strokeWidth={3} lineDashPattern={[5, 10]} />
+            </MapView>
+
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                <Text style={styles.backBtnText}>←</Text>
+            </TouchableOpacity>
+
+            <View style={styles.headerPill}>
+                <Text style={styles.orderId}>{order.id}</Text>
+                <Text style={styles.etaText}>
+                    {status === 'delivered' ? 'Completed' : (order.eta || '15 min')}
+                </Text>
             </View>
 
-            {/* Status Card */}
-            <View style={styles.statusCard}>
-                <Text style={styles.statusEmoji}>{STEPS[currentStep].icon}</Text>
-                <Text style={styles.statusText}>{t(STEPS[currentStep].label)}</Text>
-                {currentStep < STEPS.length - 1 && (
-                    <Text style={styles.eta}>🕐 {t('tracking.eta')}: ~{12 - currentStep * 3} min</Text>
+            {/* Bottom Sheet Details */}
+            <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+                {isAnonymous && (
+                    <View style={styles.anonymousBanner}>
+                        <Text style={styles.anonIcon}>🔒</Text>
+                        <Text style={styles.anonText}>{t('tracking.privacyActive', 'Privacy Active: Rider cannot see your number')}</Text>
+                    </View>
                 )}
-            </View>
 
-            {/* Progress Steps */}
-            <View style={styles.stepsContainer}>
-                {STEPS.map((step, i) => {
-                    const isCompleted = i <= currentStep;
-                    const isCurrent = i === currentStep;
-                    return (
-                        <View key={step.key} style={styles.stepRow}>
-                            <View style={styles.stepIndicator}>
-                                <View
-                                    style={[
-                                        styles.stepDot,
-                                        isCompleted && styles.stepDotCompleted,
-                                        isCurrent && styles.stepDotCurrent,
-                                    ]}
-                                >
-                                    <Text style={styles.stepIcon}>
-                                        {isCompleted ? step.icon : '○'}
-                                    </Text>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetScroll}>
+                    <Text style={styles.shopName}>{shop.name}</Text>
+
+                    {/* Status Stepper */}
+                    <View style={styles.stepper}>
+                        {steps.map((step, index) => {
+                            const isCompleted = index <= currentStepIndex;
+                            const isActive = index === currentStepIndex;
+                            return (
+                                <View key={step.key} style={styles.step}>
+                                    <View style={[styles.stepIconWrap, isCompleted && styles.stepIconCompleted]}>
+                                        <Text style={styles.stepIcon}>{step.icon}</Text>
+                                    </View>
+                                    <View style={styles.stepContent}>
+                                        <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
+                                            {step.label}
+                                        </Text>
+                                    </View>
+                                    {index < steps.length - 1 && (
+                                        <View style={[styles.stepLine, isCompleted && styles.stepLineCompleted]} />
+                                    )}
                                 </View>
-                                {i < STEPS.length - 1 && (
-                                    <View
-                                        style={[
-                                            styles.stepLine,
-                                            i < currentStep && styles.stepLineCompleted,
-                                        ]}
-                                    />
-                                )}
+                            );
+                        })}
+                    </View>
+
+                    {/* Rider Info */}
+                    {status === 'on_the_way' && order.riderName && (
+                        <View style={styles.riderCard}>
+                            <View style={styles.riderAvatar} />
+                            <View style={styles.riderInfo}>
+                                <Text style={styles.riderName}>{order.riderName}</Text>
+                                <Text style={styles.riderMeta}>⭐ {order.riderRating} • Motorcycle</Text>
                             </View>
-                            <Text
-                                style={[
-                                    styles.stepLabel,
-                                    isCompleted && styles.stepLabelCompleted,
-                                    isCurrent && styles.stepLabelCurrent,
-                                ]}
-                            >
-                                {t(step.label)}
-                            </Text>
+                            <TouchableOpacity style={styles.callBtn}>
+                                <Text style={styles.callIcon}>📞</Text>
+                            </TouchableOpacity>
                         </View>
-                    );
-                })}
-            </View>
+                    )}
 
-            {/* Map Placeholder */}
-            <View style={styles.mapPlaceholder}>
-                <Text style={styles.mapIcon}>🗺️</Text>
-                <Text style={styles.mapText}>Live map will appear here</Text>
-            </View>
-
-            {/* Rider Info */}
-            {currentStep >= 2 && (
-                <View style={styles.riderCard}>
-                    <View style={styles.riderInfo}>
-                        <Text style={styles.riderAvatar}>🏍️</Text>
-                        <View>
-                            <Text style={styles.riderName}>{t('tracking.riderName')}: Ahmed</Text>
-                            <Text style={styles.riderRating}>⭐ 4.9</Text>
+                    {/* Items Summary */}
+                    <View style={styles.itemsSummary}>
+                        <Text style={styles.summaryTitle}>Order Summary</Text>
+                        {order.items.map((item, idx) => (
+                            <View key={idx} style={styles.summaryItem}>
+                                <Text style={styles.summaryItemText}>
+                                    {item.quantity}x {item.product.name}
+                                </Text>
+                                <Text style={styles.summaryItemPrice}>
+                                    Rs {(item.quantity * item.product.price).toLocaleString()}
+                                </Text>
+                            </View>
+                        ))}
+                        <View style={styles.summaryTotalRow}>
+                            <Text style={styles.summaryTotalLabel}>Total</Text>
+                            <Text style={styles.summaryTotalValue}>Rs {order.total.toLocaleString()}</Text>
                         </View>
                     </View>
-                    <View style={styles.riderActions}>
-                        <TouchableOpacity style={styles.callBtn}>
-                            <Text style={styles.actionBtnText}>📞</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.chatBtn}>
-                            <Text style={styles.actionBtnText}>💬</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            )}
 
-            {/* Anonymous Badge */}
-            {isAnonymous && (
-                <View style={styles.anonBadge}>
-                    <Text style={styles.anonText}>🔒 {t('cart.anonymousHint')}</Text>
-                </View>
-            )}
-
-            {/* Order Info Footer */}
-            <View style={styles.footer}>
-                <Text style={styles.footerShop}>🏪 {shopName}</Text>
-                <Text style={styles.footerTotal}>PKR {total.toLocaleString()}</Text>
-            </View>
+                    {/* Cancel Button */}
+                    {status === 'confirmed' && (
+                        <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
+                            <Text style={styles.cancelBtnText}>Cancel Order</Text>
+                        </TouchableOpacity>
+                    )}
+                </ScrollView>
+            </Animated.View>
         </View>
     );
 }
@@ -147,163 +197,175 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.snow,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingTop: 54,
-        paddingBottom: Spacing.md,
-        paddingHorizontal: Spacing.xl,
+    backButton: {
+        position: 'absolute',
+        top: 60,
+        left: Spacing.lg,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: Colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.ghost,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 5,
+        zIndex: 10,
     },
-    backBtn: {
-        ...Typography.label,
-        color: Colors.accent,
-    },
-    headerTitle: {
-        ...Typography.h3,
+    backBtnText: {
+        fontSize: 24,
         color: Colors.dark,
+        lineHeight: 28,
+    },
+    headerPill: {
+        position: 'absolute',
+        top: 60,
+        alignSelf: 'center',
+        backgroundColor: Colors.white,
+        paddingHorizontal: Spacing.xl,
+        paddingVertical: Spacing.sm,
+        borderRadius: Radius.full,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 5,
+        zIndex: 9,
+        alignItems: 'center',
     },
     orderId: {
-        ...Typography.labelSmall,
-        color: Colors.gray,
-    },
-    statusCard: {
-        alignItems: 'center',
-        paddingVertical: Spacing.xxl,
-        backgroundColor: Colors.white,
-        marginHorizontal: Spacing.xl,
-        marginTop: Spacing.xl,
-        borderRadius: Radius.lg,
-        shadowColor: Colors.cardShadow,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 1,
-        shadowRadius: 16,
-        elevation: 4,
-    },
-    statusEmoji: {
-        fontSize: 48,
-        marginBottom: Spacing.sm,
-    },
-    statusText: {
-        ...Typography.h3,
+        ...Typography.label,
         color: Colors.dark,
     },
-    eta: {
-        ...Typography.label,
-        color: Colors.accent,
-        marginTop: Spacing.sm,
+    etaText: {
+        ...Typography.h3,
+        color: Colors.primary,
+        marginTop: 2,
     },
-    stepsContainer: {
-        paddingHorizontal: Spacing.xxl,
-        paddingVertical: Spacing.xl,
+    sheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: Colors.white,
+        borderTopLeftRadius: Radius.xxl,
+        borderTopRightRadius: Radius.xxl,
+        maxHeight: '65%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 20,
     },
-    stepRow: {
+    sheetScroll: {
+        padding: Spacing.xl,
+        paddingBottom: 40,
+    },
+    anonymousBanner: {
+        backgroundColor: Colors.anonymous,
         flexDirection: 'row',
-        alignItems: 'flex-start',
-    },
-    stepIndicator: {
         alignItems: 'center',
-        width: 40,
+        padding: Spacing.sm,
+        paddingHorizontal: Spacing.xl,
+        borderTopLeftRadius: Radius.xxl,
+        borderTopRightRadius: Radius.xxl,
     },
-    stepDot: {
+    anonIcon: {
+        fontSize: 16,
+        marginRight: Spacing.sm,
+    },
+    anonText: {
+        ...Typography.caption,
+        color: Colors.white,
+        fontWeight: 'bold',
+    },
+    shopName: {
+        ...Typography.h2,
+        color: Colors.dark,
+        marginBottom: Spacing.xl,
+        textAlign: 'center',
+    },
+    stepper: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.xxxl,
+    },
+    step: {
+        alignItems: 'center',
+        flex: 1,
+        position: 'relative',
+    },
+    stepIconWrap: {
         width: 36,
         height: 36,
         borderRadius: 18,
-        backgroundColor: Colors.ghost,
+        backgroundColor: Colors.mist,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: Colors.mist,
+        zIndex: 2,
     },
-    stepDotCompleted: {
-        backgroundColor: Colors.primaryFaded,
-        borderColor: Colors.primary,
-    },
-    stepDotCurrent: {
+    stepIconCompleted: {
         backgroundColor: Colors.primary,
-        borderColor: Colors.primary,
     },
     stepIcon: {
-        fontSize: 16,
+        fontSize: 18,
+    },
+    stepContent: {
+        marginTop: Spacing.xs,
+        position: 'absolute',
+        top: 40,
+        width: 80,
+    },
+    stepLabel: {
+        ...Typography.labelSmall,
+        color: Colors.gray,
+        fontSize: 10,
+        textAlign: 'center',
+    },
+    stepLabelActive: {
+        color: Colors.primary,
+        fontWeight: 'bold',
     },
     stepLine: {
-        width: 3,
-        height: 24,
+        position: 'absolute',
+        top: 18,
+        left: '50%',
+        width: '100%',
+        height: 2,
         backgroundColor: Colors.mist,
-        marginVertical: 2,
+        zIndex: 1,
     },
     stepLineCompleted: {
         backgroundColor: Colors.primary,
     },
-    stepLabel: {
-        ...Typography.body,
-        color: Colors.slate,
-        marginLeft: Spacing.md,
-        marginTop: Spacing.sm,
-    },
-    stepLabelCompleted: {
-        color: Colors.charcoal,
-    },
-    stepLabelCurrent: {
-        color: Colors.primary,
-        fontWeight: '700',
-    },
-    mapPlaceholder: {
-        marginHorizontal: Spacing.xl,
-        height: 120,
-        backgroundColor: Colors.ghost,
-        borderRadius: Radius.lg,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: Colors.mist,
-        borderStyle: 'dashed',
-    },
-    mapIcon: {
-        fontSize: 32,
-        marginBottom: Spacing.xs,
-    },
-    mapText: {
-        ...Typography.bodySmall,
-        color: Colors.slate,
-    },
     riderCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        margin: Spacing.xl,
-        padding: Spacing.base,
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.ghost,
+        padding: Spacing.md,
         borderRadius: Radius.lg,
-        shadowColor: Colors.cardShadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    riderInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.md,
+        marginBottom: Spacing.xl,
     },
     riderAvatar: {
-        fontSize: 32,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: Colors.silver,
+    },
+    riderInfo: {
+        flex: 1,
+        marginLeft: Spacing.md,
     },
     riderName: {
         ...Typography.label,
         color: Colors.dark,
     },
-    riderRating: {
+    riderMeta: {
         ...Typography.caption,
-        color: Colors.warm,
+        color: Colors.gray,
         marginTop: 2,
-    },
-    riderActions: {
-        flexDirection: 'row',
-        gap: Spacing.sm,
     },
     callBtn: {
         width: 44,
@@ -312,51 +374,63 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.primaryFaded,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: Colors.primary,
     },
-    chatBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: Colors.accentFaded,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    actionBtnText: {
+    callIcon: {
         fontSize: 20,
     },
-    anonBadge: {
-        marginHorizontal: Spacing.xl,
-        padding: Spacing.md,
-        backgroundColor: Colors.anonymous,
-        borderRadius: Radius.md,
-        borderWidth: 1,
-        borderColor: Colors.anonymousBorder,
-        alignItems: 'center',
+    itemsSummary: {
+        backgroundColor: Colors.snow,
+        padding: Spacing.lg,
+        borderRadius: Radius.lg,
+        marginBottom: Spacing.xl,
     },
-    anonText: {
+    summaryTitle: {
         ...Typography.label,
         color: Colors.charcoal,
+        marginBottom: Spacing.md,
     },
-    footer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
+    summaryItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: Spacing.xl,
-        paddingBottom: Spacing.xxl,
-        backgroundColor: Colors.white,
+        marginBottom: Spacing.sm,
+    },
+    summaryItemText: {
+        ...Typography.body,
+        color: Colors.dark,
+        flex: 1,
+    },
+    summaryItemPrice: {
+        ...Typography.body,
+        color: Colors.gray,
+    },
+    summaryTotalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         borderTopWidth: 1,
-        borderTopColor: Colors.ghost,
+        borderTopColor: Colors.mist,
+        marginTop: Spacing.sm,
+        paddingTop: Spacing.md,
     },
-    footerShop: {
+    summaryTotalLabel: {
         ...Typography.label,
-        color: Colors.charcoal,
+        color: Colors.dark,
     },
-    footerTotal: {
-        ...Typography.price,
+    summaryTotalValue: {
+        ...Typography.h3,
         color: Colors.primary,
+    },
+    cancelBtn: {
+        paddingVertical: Spacing.md,
+        alignItems: 'center',
+    },
+    cancelBtnText: {
+        ...Typography.label,
+        color: Colors.danger,
+    },
+    backBtn: {
+        ...Typography.label,
+        color: Colors.accent,
     },
 });

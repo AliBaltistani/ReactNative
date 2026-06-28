@@ -4,6 +4,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, StyleSheet } from 'react-native';
 import { Colors, Typography } from '../theme';
+import { useAuthStore } from '../store/authStore';
+import { useSettingsStore } from '../store/settingsStore';
 
 // Auth
 import OnboardingScreen from '../screens/auth/OnboardingScreen';
@@ -214,11 +216,27 @@ function SellerTabs() {
 
 // ─── Root Navigator ─────────────────────────────────────────
 export default function RootNavigator() {
+    const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+    const hasSeenOnboarding = useSettingsStore((s) => s.hasSeenOnboarding);
+    const currentRole = useAuthStore((s) => s.currentRole);
+
+    // Determine initial route based on auth/onboarding state
+    const getInitialRoute = (): string => {
+        if (!hasSeenOnboarding) return 'Onboarding';
+        if (!isAuthenticated) return 'Login';
+
+        switch (currentRole) {
+            case 'rider': return 'RiderTabs';
+            case 'seller': return 'SellerTabs';
+            default: return 'CustomerTabs';
+        }
+    };
+
     return (
         <NavigationContainer>
             <Stack.Navigator
                 screenOptions={{ headerShown: false }}
-                initialRouteName="Onboarding"
+                initialRouteName={getInitialRoute()}
             >
                 {/* Auth flow */}
                 <Stack.Screen name="Onboarding" component={OnboardingScreen} />

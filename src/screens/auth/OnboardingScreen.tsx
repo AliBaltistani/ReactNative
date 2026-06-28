@@ -6,11 +6,11 @@ import {
     TouchableOpacity,
     FlatList,
     Dimensions,
-    Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
 import { t } from '../../i18n';
+import { useSettingsStore } from '../../store/settingsStore';
 
 const { width } = Dimensions.get('window');
 
@@ -48,6 +48,7 @@ interface OnboardingScreenProps {
 export default function OnboardingScreen({ navigation }: OnboardingScreenProps) {
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
+    const { language, setLanguage, markOnboardingSeen } = useSettingsStore();
 
     const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
         if (viewableItems?.length > 0) {
@@ -58,6 +59,7 @@ export default function OnboardingScreen({ navigation }: OnboardingScreenProps) 
     const viewabilityConfig = { viewAreaCoveragePercentThreshold: 50 };
 
     const handleGetStarted = () => {
+        markOnboardingSeen();
         navigation.navigate('Login');
     };
 
@@ -108,11 +110,17 @@ export default function OnboardingScreen({ navigation }: OnboardingScreenProps) 
 
                 <View style={styles.languageRow}>
                     <Text style={styles.langLabel}>{t('auth.selectLanguage')}:</Text>
-                    <TouchableOpacity style={[styles.langBtn, styles.langBtnActive]}>
-                        <Text style={[styles.langBtnText, styles.langBtnTextActive]}>English</Text>
+                    <TouchableOpacity
+                        style={[styles.langBtn, language === 'en' && styles.langBtnActive]}
+                        onPress={() => setLanguage('en')}
+                    >
+                        <Text style={[styles.langBtnText, language === 'en' && styles.langBtnTextActive]}>English</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.langBtn}>
-                        <Text style={styles.langBtnText}>اردو</Text>
+                    <TouchableOpacity
+                        style={[styles.langBtn, language === 'ur' && styles.langBtnActive]}
+                        onPress={() => setLanguage('ur')}
+                    >
+                        <Text style={[styles.langBtnText, language === 'ur' && styles.langBtnTextActive]}>اردو</Text>
                     </TouchableOpacity>
                 </View>
             </View>

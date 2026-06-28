@@ -157,8 +157,9 @@ export const MOCK_DELIVERY_REQUEST: DeliveryRequest = {
 };
 
 export const MOCK_SELLER_STATS: SellerStats = {
-    todayOrders: 23,
-    todaySales: 4500,
+    pendingOrders: 14,
+    todayOrders: 42,
+    todaySales: 125000,
     rating: 4.8,
 };
 

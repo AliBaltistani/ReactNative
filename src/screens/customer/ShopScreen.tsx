@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     View,
     Text,
@@ -6,12 +6,15 @@ import {
     ScrollView,
     TouchableOpacity,
     Image,
+    ActivityIndicator,
 } from 'react-native';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
 import { t } from '../../i18n';
-import { SHOPS, PRODUCTS } from '../../data/mockData';
 import ProductCard from '../../components/ProductCard';
-import type { CartItem } from '../../types';
+
+import { useCartStore } from '../../store/cartStore';
+import { shopService } from '../../services/shopService';
+import type { Shop, Product } from '../../types';
 
 interface ShopScreenProps {
     navigation: any;
@@ -20,11 +23,38 @@ interface ShopScreenProps {
 
 export default function ShopScreen({ navigation, route }: ShopScreenProps) {
     const shopId = route.params?.shopId || 's1';
-    const shop = SHOPS.find((s) => s.id === shopId) || SHOPS[0];
-    const shopProducts = PRODUCTS.filter((p) => p.shopId === shopId);
 
-    const [cart, setCart] = useState<Record<string, number>>({});
+    // Global Cart State
+    const cartItems = useCartStore((s) => s.items);
+    const cartShopId = useCartStore((s) => s.shopId);
+    const addToCart = useCartStore((s) => s.addItem);
+    const updateQuantity = useCartStore((s) => s.updateQuantity);
+    const cartTotalItems = useCartStore((s) => s.totalItems());
+    const cartSubtotal = useCartStore((s) => s.subtotal());
+
+    // Local State
+    const [shop, setShop] = useState<Shop | null>(null);
+    const [shopProducts, setShopProducts] = useState<Product[]>([]);
     const [activeCategory, setActiveCategory] = useState('All');
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        loadShopData();
+    }, [shopId]);
+
+    const loadShopData = async () => {
+        setIsLoading(true);
+        try {
+            const [shopData, productsData] = await Promise.all([
+                shopService.getShopById(shopId),
+                shopService.getShopProducts(shopId)
+            ]);
+            setShop(shopData);
+            setShopProducts(productsData);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const categories = useMemo(() => {
         const cats = ['All', ...new Set(shopProducts.map((p) => p.category))];
@@ -36,36 +66,36 @@ export default function ShopScreen({ navigation, route }: ShopScreenProps) {
         return shopProducts.filter((p) => p.category === activeCategory);
     }, [activeCategory, shopProducts]);
 
-    const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
-    const cartTotal = Object.entries(cart).reduce((sum, [id, qty]) => {
-        const p = PRODUCTS.find((pr) => pr.id === id);
-        return sum + (p ? p.price * qty : 0);
-    }, 0);
-
-    const addToCart = (productId: string) => {
-        setCart((prev) => ({ ...prev, [productId]: (prev[productId] || 0) + 1 }));
-    };
-    const increment = (productId: string) => {
-        setCart((prev) => ({ ...prev, [productId]: (prev[productId] || 0) + 1 }));
-    };
-    const decrement = (productId: string) => {
-        setCart((prev) => {
-            const newQty = (prev[productId] || 0) - 1;
-            if (newQty <= 0) {
-                const { [productId]: _, ...rest } = prev;
-                return rest;
-            }
-            return { ...prev, [productId]: newQty };
-        });
+    const handleAdd = (product: Product) => {
+        const success = addToCart(product, shop!.id, shop!.name);
+        if (!success) {
+            // Cart conflict (different shop) - handled by store, we just need to alert
+            alert("You have items from another shop in your cart. Please clear them first.");
+        }
     };
 
-    const goToCart = () => {
-        const items: CartItem[] = Object.entries(cart).map(([id, quantity]) => ({
-            product: PRODUCTS.find((p) => p.id === id)!,
-            quantity,
-        }));
-        navigation.navigate('Cart', { items, shop });
+    const getProductQty = (productId: string) => {
+        const item = cartItems.find((i) => i.product.id === productId);
+        return item ? item.quantity : 0;
     };
+
+    const handleIncrement = (productId: string) => {
+        const qty = getProductQty(productId);
+        updateQuantity(productId, qty + 1);
+    };
+
+    const handleDecrement = (productId: string) => {
+        const qty = getProductQty(productId);
+        updateQuantity(productId, qty - 1);
+    };
+
+    if (isLoading || !shop) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -88,29 +118,31 @@ export default function ShopScreen({ navigation, route }: ShopScreenProps) {
             </View>
 
             {/* Category Tabs */}
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.catTabs}
-                contentContainerStyle={styles.catTabsContent}
-            >
-                {categories.map((cat) => (
-                    <TouchableOpacity
-                        key={cat}
-                        style={[styles.catTab, activeCategory === cat && styles.catTabActive]}
-                        onPress={() => setActiveCategory(cat)}
-                    >
-                        <Text
-                            style={[
-                                styles.catTabText,
-                                activeCategory === cat && styles.catTabTextActive,
-                            ]}
+            <View style={styles.catTabsWrap}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.catTabs}
+                    contentContainerStyle={styles.catTabsContent}
+                >
+                    {categories.map((cat) => (
+                        <TouchableOpacity
+                            key={cat}
+                            style={[styles.catTab, activeCategory === cat && styles.catTabActive]}
+                            onPress={() => setActiveCategory(cat)}
                         >
-                            {cat === 'All' ? t('shop.allItems') : cat}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
+                            <Text
+                                style={[
+                                    styles.catTabText,
+                                    activeCategory === cat && styles.catTabTextActive,
+                                ]}
+                            >
+                                {cat === 'All' ? t('shop.allItems') : cat}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
 
             {/* Products */}
             <ScrollView
@@ -122,10 +154,10 @@ export default function ShopScreen({ navigation, route }: ShopScreenProps) {
                     <ProductCard
                         key={product.id}
                         product={product}
-                        quantity={cart[product.id] || 0}
-                        onAdd={() => addToCart(product.id)}
-                        onIncrement={() => increment(product.id)}
-                        onDecrement={() => decrement(product.id)}
+                        quantity={getProductQty(product.id)}
+                        onAdd={() => handleAdd(product)}
+                        onIncrement={() => handleIncrement(product.id)}
+                        onDecrement={() => handleDecrement(product.id)}
                     />
                 ))}
 
@@ -140,15 +172,15 @@ export default function ShopScreen({ navigation, route }: ShopScreenProps) {
             </ScrollView>
 
             {/* Cart Bottom Bar */}
-            {cartCount > 0 && (
-                <TouchableOpacity style={styles.cartBar} onPress={goToCart}>
+            {cartTotalItems > 0 && cartShopId === shopId && (
+                <TouchableOpacity style={styles.cartBar} onPress={() => navigation.navigate('Cart')}>
                     <View style={styles.cartBarLeft}>
                         <View style={styles.cartBadge}>
-                            <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                            <Text style={styles.cartBadgeText}>{cartTotalItems}</Text>
                         </View>
                         <Text style={styles.cartBarText}>View Cart</Text>
                     </View>
-                    <Text style={styles.cartBarPrice}>PKR {cartTotal.toLocaleString()}</Text>
+                    <Text style={styles.cartBarPrice}>PKR {cartSubtotal.toLocaleString()}</Text>
                 </TouchableOpacity>
             )}
         </View>
@@ -213,11 +245,13 @@ const styles = StyleSheet.create({
         marginHorizontal: 8,
         color: Colors.silver,
     },
-    catTabs: {
+    catTabsWrap: {
         backgroundColor: Colors.white,
-        maxHeight: 52,
         borderBottomWidth: 1,
         borderBottomColor: Colors.ghost,
+    },
+    catTabs: {
+        maxHeight: 60,
     },
     catTabsContent: {
         paddingHorizontal: Spacing.base,

@@ -5,53 +5,123 @@ import {
     StyleSheet,
     ScrollView,
     TouchableOpacity,
-    TextInput,
     Switch,
     Alert,
+    ActivityIndicator,
+    Platform,
+    TextInput,
 } from 'react-native';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
 import { t } from '../../i18n';
-import type { CartItem, Shop } from '../../types';
+import Toast from '../../components/Toast';
+
+import { useCartStore } from '../../store/cartStore';
+import { useSettingsStore } from '../../store/settingsStore';
+import { useOrderStore } from '../../store/orderStore';
+import { orderService } from '../../services/orderService';
 
 interface CartScreenProps {
     navigation: any;
-    route: any;
 }
 
-export default function CartScreen({ navigation, route }: CartScreenProps) {
-    const items: CartItem[] = route.params?.items || [];
-    const shop: Shop | null = route.params?.shop || null;
+export default function CartScreen({ navigation }: CartScreenProps) {
+    // Stores
+    const cartStore = useCartStore();
+    const defaultAnonymous = useSettingsStore((s) => s.defaultAnonymous);
+    const placeOrder = useOrderStore((s) => s.placeOrder);
 
-    const [address, setAddress] = useState('');
-    const [isAnonymous, setIsAnonymous] = useState(false);
-    const [leaveAtDoor, setLeaveAtDoor] = useState(false);
+    // Derived cart state
+    const items = cartStore.items;
+    const shopName = cartStore.shopName;
+    const itemsTotal = cartStore.subtotal();
+    const deliveryFee = cartStore.deliveryFee();
+    const total = cartStore.grandTotal();
 
-    const itemsTotal = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
-    const deliveryFee = 60;
-    const total = itemsTotal + deliveryFee;
+    // Local state for UI loading
+    const [isLoading, setIsLoading] = useState(false);
+    const [toastMessage, setToastMessage] = useState('');
 
-    const handlePlaceOrder = () => {
+    // Form inputs (synced with cart store for persistence)
+    const [address, setAddress] = useState(cartStore.deliveryAddress);
+    const [landmark, setLandmark] = useState(cartStore.landmark);
+    const [isAnonymous, setIsAnonymous] = useState(defaultAnonymous || cartStore.isAnonymous);
+    const [leaveAtDoor, setLeaveAtDoor] = useState(cartStore.leaveAtDoor);
+
+    const handlePlaceOrder = async () => {
         if (!address.trim()) {
-            Alert.alert('Location Required', 'Please enter a delivery location/landmark');
+            Alert.alert('Location Required', 'Please enter a delivery location');
             return;
         }
-        navigation.navigate('Tracking', {
-            orderId: '#' + Math.floor(1000 + Math.random() * 9000),
-            shopName: shop?.name || 'Shop',
-            total,
-            isAnonymous,
-        });
+
+        // Sync local form state to store right before order
+        cartStore.setDeliveryAddress(address);
+        cartStore.setLandmark(landmark);
+        cartStore.setAnonymous(isAnonymous);
+        cartStore.setLeaveAtDoor(leaveAtDoor);
+
+        setIsLoading(true);
+        try {
+            // Place real order via service
+            const newOrder = await orderService.placeOrder({
+                items: cartStore.items,
+                shop: { id: cartStore.shopId!, name: cartStore.shopName } as any, // Only need ID/Name for payload
+                deliveryAddress: address,
+                landmark,
+                isAnonymous,
+                leaveAtDoor,
+                deliveryFee,
+                total,
+                paymentMethod: 'cash'
+            });
+
+            // Add to zustand order store (simulates tracking)
+            placeOrder(newOrder);
+
+            // Clear cart & navigate to tracking
+            cartStore.clearCart();
+            navigation.navigate('Tracking', {
+                orderId: newOrder.id,
+                shopName: newOrder.shop.name,
+                total: newOrder.total,
+                isAnonymous: newOrder.isAnonymous,
+            });
+        } catch (err) {
+            setToastMessage('Failed to place order. Try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
+
+    if (items.length === 0) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ position: 'absolute', top: 60, left: 20 }}>
+                    <Text style={styles.backBtn}>← {t('common.back')}</Text>
+                </TouchableOpacity>
+                <Text style={{ fontSize: 60, marginBottom: 20 }}>🛒</Text>
+                <Text style={styles.headerTitle}>Your cart is empty</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
+            <Toast
+                visible={!!toastMessage}
+                message={toastMessage}
+                type="error"
+                onHide={() => setToastMessage('')}
+            />
+
             {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.backBtn}>← {t('common.back')}</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>🛒 {t('cart.title')}</Text>
-                <View style={{ width: 60 }} />
+                <TouchableOpacity onPress={() => cartStore.clearCart()}>
+                    <Text style={styles.clearBtn}>Clear</Text>
+                </TouchableOpacity>
             </View>
 
             <ScrollView
@@ -60,19 +130,25 @@ export default function CartScreen({ navigation, route }: CartScreenProps) {
                 showsVerticalScrollIndicator={false}
             >
                 {/* Shop Name */}
-                {shop && (
-                    <Text style={styles.shopName}>🏪 {shop.name}</Text>
-                )}
+                <Text style={styles.shopName}>🏪 {shopName}</Text>
 
                 {/* Cart Items */}
-                {items.map((item, i) => (
-                    <View key={i} style={styles.cartItem}>
+                {items.map((item) => (
+                    <View key={item.product.id} style={styles.cartItem}>
                         <View style={styles.cartItemInfo}>
                             <Text style={styles.cartItemName}>{item.product.name}</Text>
                             <Text style={styles.cartItemNameUr}>{item.product.nameUr}</Text>
                         </View>
                         <View style={styles.cartItemRight}>
-                            <Text style={styles.cartItemQty}>×{item.quantity}</Text>
+                            <View style={styles.qtyControls}>
+                                <TouchableOpacity onPress={() => cartStore.updateQuantity(item.product.id, item.quantity - 1)}>
+                                    <Text style={styles.qtyBtn}>-</Text>
+                                </TouchableOpacity>
+                                <Text style={styles.cartItemQty}>{item.quantity}</Text>
+                                <TouchableOpacity onPress={() => cartStore.updateQuantity(item.product.id, item.quantity + 1)}>
+                                    <Text style={styles.qtyBtn}>+</Text>
+                                </TouchableOpacity>
+                            </View>
                             <Text style={styles.cartItemPrice}>
                                 PKR {(item.product.price * item.quantity).toLocaleString()}
                             </Text>
@@ -157,9 +233,19 @@ export default function CartScreen({ navigation, route }: CartScreenProps) {
 
             {/* Place Order */}
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.orderBtn} onPress={handlePlaceOrder}>
-                    <Text style={styles.orderBtnText}>🟢 {t('cart.placeOrder')}</Text>
-                    <Text style={styles.orderBtnPrice}>PKR {total.toLocaleString()}</Text>
+                <TouchableOpacity
+                    style={[styles.orderBtn, isLoading && { opacity: 0.7 }]}
+                    onPress={handlePlaceOrder}
+                    disabled={isLoading}
+                >
+                    {isLoading ? (
+                        <ActivityIndicator color={Colors.white} />
+                    ) : (
+                        <>
+                            <Text style={styles.orderBtnText}>🟢 {t('cart.placeOrder')}</Text>
+                            <Text style={styles.orderBtnPrice}>PKR {total.toLocaleString()}</Text>
+                        </>
+                    )}
                 </TouchableOpacity>
             </View>
         </View>
@@ -175,7 +261,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: 54,
+        paddingTop: Platform.OS === 'ios' ? 60 : 40,
         paddingBottom: Spacing.md,
         paddingHorizontal: Spacing.xl,
         backgroundColor: Colors.white,
@@ -186,6 +272,10 @@ const styles = StyleSheet.create({
         ...Typography.label,
         color: Colors.accent,
     },
+    clearBtn: {
+        ...Typography.label,
+        color: Colors.danger,
+    },
     headerTitle: {
         ...Typography.h3,
         color: Colors.dark,
@@ -195,7 +285,7 @@ const styles = StyleSheet.create({
     },
     bodyContent: {
         padding: Spacing.xl,
-        paddingBottom: 120,
+        paddingBottom: 150,
     },
     shopName: {
         ...Typography.h3,
@@ -225,10 +315,24 @@ const styles = StyleSheet.create({
     cartItemRight: {
         alignItems: 'flex-end',
     },
+    qtyControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.ghost,
+        borderRadius: Radius.sm,
+        marginBottom: Spacing.xs,
+        paddingHorizontal: 4,
+    },
+    qtyBtn: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        ...Typography.h3,
+        color: Colors.primary,
+    },
     cartItemQty: {
-        ...Typography.labelSmall,
-        color: Colors.slate,
-        marginBottom: 2,
+        ...Typography.label,
+        color: Colors.dark,
+        marginHorizontal: 8,
     },
     cartItemPrice: {
         ...Typography.label,
@@ -354,7 +458,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         padding: Spacing.xl,
-        paddingBottom: Spacing.xxl,
+        paddingBottom: Platform.OS === 'ios' ? 34 : Spacing.xl,
         backgroundColor: Colors.white,
         borderTopWidth: 1,
         borderTopColor: Colors.ghost,

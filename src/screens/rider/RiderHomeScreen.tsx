@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
-    TouchableOpacity,
     ScrollView,
-    Animated,
+    TouchableOpacity,
+    Switch,
+    ActivityIndicator,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
-import { t } from '../../i18n';
-import { MOCK_RIDER_STATS, MOCK_DELIVERY_REQUEST } from '../../data/mockData';
+import Toast from '../../components/Toast';
+import { riderService } from '../../services/riderService';
+import type { DeliveryRequest, RiderStats } from '../../types';
 
 interface RiderHomeScreenProps {
     navigation: any;
@@ -18,413 +19,214 @@ interface RiderHomeScreenProps {
 
 export default function RiderHomeScreen({ navigation }: RiderHomeScreenProps) {
     const [isOnline, setIsOnline] = useState(false);
-    const [showRequest, setShowRequest] = useState(false);
-    const [timeLeft, setTimeLeft] = useState(30);
-    const pulseAnim = useRef(new Animated.Value(1)).current;
-    const stats = MOCK_RIDER_STATS;
-    const request = MOCK_DELIVERY_REQUEST;
+    const [stats, setStats] = useState<RiderStats | null>(null);
+    const [requests, setRequests] = useState<DeliveryRequest[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [toast, setToast] = useState('');
 
-    // Pulse animation for online button
     useEffect(() => {
-        if (isOnline && !showRequest) {
-            const pulse = Animated.loop(
-                Animated.sequence([
-                    Animated.timing(pulseAnim, {
-                        toValue: 1.08,
-                        duration: 1000,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(pulseAnim, {
-                        toValue: 1,
-                        duration: 1000,
-                        useNativeDriver: true,
-                    }),
-                ])
-            );
-            pulse.start();
-            // Show a request after 3 seconds
-            const reqTimer = setTimeout(() => setShowRequest(true), 3000);
-            return () => {
-                pulse.stop();
-                clearTimeout(reqTimer);
-            };
-        }
-    }, [isOnline, showRequest]);
+        loadDashboard();
+    }, []);
 
-    // Countdown for delivery request
-    useEffect(() => {
-        if (showRequest && timeLeft > 0) {
-            const timer = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
-            return () => clearTimeout(timer);
+    const loadDashboard = async () => {
+        setIsLoading(true);
+        try {
+            const [statsData, reqsData] = await Promise.all([
+                riderService.getRiderStats(),
+                riderService.getDeliveryRequests()
+            ]);
+            setStats(statsData);
+            setRequests(reqsData);
+        } finally {
+            setIsLoading(false);
         }
-    }, [showRequest, timeLeft]);
-
-    const handleAccept = () => {
-        setShowRequest(false);
-        setTimeLeft(30);
     };
 
-    const handleSkip = () => {
-        setShowRequest(false);
-        setTimeLeft(30);
+    const toggleOnline = async () => {
+        const temp = !isOnline;
+        setIsOnline(temp); // Optimistic UI
+        const success = temp ? await riderService.goOnline() : await riderService.goOffline();
+        if (!success) {
+            setIsOnline(!temp); // Revert
+            setToast('Network error modifying status');
+        } else {
+            setToast(`You are now ${temp ? 'online' : 'offline'}`);
+        }
     };
+
+    const handleAccept = async (id: string) => {
+        const success = await riderService.acceptDelivery(id);
+        if (success) {
+            setToast('Delivery Accepted! Navigating to map...');
+            // In a real app we would navigate to RiderTracking 
+            // For now, reload list to remove request
+            setRequests(prev => prev.filter(req => req.id !== id));
+        }
+    };
+
+    const handleDecline = async (id: string) => {
+        await riderService.skipDelivery(id);
+        setRequests(prev => prev.filter(req => req.id !== id));
+    };
+
+    if (isLoading || !stats) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <LinearGradient colors={Colors.gradientDark} style={styles.header}>
-                <Text style={styles.headerTitle}>🏍️ {t('rider.title')}</Text>
-                <Text style={styles.headerRating}>⭐ {stats.rating}</Text>
-            </LinearGradient>
+            <Toast visible={!!toast} message={toast} type="success" onHide={() => setToast('')} />
 
-            <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-                {/* Earnings Card */}
-                <View style={styles.earningsCard}>
-                    <Text style={styles.earningsLabel}>{t('rider.todayEarnings')}</Text>
-                    <Text style={styles.earningsValue}>PKR {stats.todayEarnings.toLocaleString()}</Text>
-                    <Text style={styles.deliveryCount}>
-                        {stats.todayDeliveries} {t('rider.deliveries')}
+            {/* Header */}
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.greeting}>Rider Dashboard 🏍️</Text>
+                    <Text style={styles.statusText}>
+                        Status: <Text style={isOnline ? styles.online : styles.offline}>
+                            {isOnline ? 'Online' : 'Offline'}
+                        </Text>
                     </Text>
                 </View>
+                <Switch
+                    value={isOnline}
+                    onValueChange={toggleOnline}
+                    trackColor={{ false: Colors.mist, true: Colors.primary + '60' }}
+                    thumbColor={isOnline ? Colors.primary : Colors.silver}
+                />
+            </View>
 
-                {/* Quick Stats */}
-                <View style={styles.quickStats}>
+            <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+                {/* Stats Grid */}
+                <View style={styles.statsGrid}>
                     <View style={styles.statCard}>
-                        <Text style={styles.statValue}>PKR {stats.weekEarnings.toLocaleString()}</Text>
-                        <Text style={styles.statLabel}>{t('rider.weekly')}</Text>
+                        <Text style={styles.statIcon}>💰</Text>
+                        <Text style={styles.statValue}>Rs {stats.todayEarnings}</Text>
+                        <Text style={styles.statLabel}>Today's Earnings</Text>
                     </View>
                     <View style={styles.statCard}>
-                        <Text style={styles.statValue}>PKR {stats.monthEarnings.toLocaleString()}</Text>
-                        <Text style={styles.statLabel}>{t('rider.monthly')}</Text>
+                        <Text style={styles.statIcon}>📦</Text>
+                        <Text style={styles.statValue}>{stats.todayDeliveries}</Text>
+                        <Text style={styles.statLabel}>Deliveries</Text>
+                    </View>
+                    <View style={styles.statCard}>
+                        <Text style={styles.statIcon}>⭐</Text>
+                        <Text style={styles.statValue}>{stats.rating}</Text>
+                        <Text style={styles.statLabel}>Rating</Text>
+                    </View>
+                    <View style={styles.statCard}>
+                        <Text style={styles.statIcon}>⚡</Text>
+                        <Text style={styles.statValue}>98%</Text>
+                        <Text style={styles.statLabel}>Acceptance</Text>
                     </View>
                 </View>
 
-                {/* Go Online Button */}
-                <Animated.View style={[styles.onlineWrap, { transform: [{ scale: isOnline ? pulseAnim : 1 }] }]}>
-                    <TouchableOpacity
-                        style={[styles.onlineBtn, isOnline && styles.onlineBtnActive]}
-                        onPress={() => {
-                            setIsOnline(!isOnline);
-                            setShowRequest(false);
-                        }}
-                    >
-                        <Text style={styles.onlineBtnIcon}>{isOnline ? '🟢' : '🔴'}</Text>
-                        <Text style={styles.onlineBtnText}>
-                            {isOnline ? t('rider.online') : t('rider.goOnline')}
-                        </Text>
-                    </TouchableOpacity>
-                </Animated.View>
+                {/* Pending Requests */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>New Requests</Text>
+                    {isOnline && <ActivityIndicator size="small" color={Colors.primary} />}
+                </View>
 
-                {isOnline && !showRequest && (
-                    <View style={styles.waitingBox}>
-                        <Text style={styles.waitingEmoji}>🏍️</Text>
-                        <Text style={styles.waitingText}>{t('rider.waitingOrders')}</Text>
+                {!isOnline ? (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyIcon}>😴</Text>
+                        <Text style={styles.emptyTitle}>You're offline</Text>
+                        <Text style={styles.emptyLabel}>Go online to receive delivery requests.</Text>
                     </View>
+                ) : requests.length === 0 ? (
+                    <View style={styles.emptyState}>
+                        <Text style={styles.emptyIcon}>📡</Text>
+                        <Text style={styles.emptyTitle}>Searching for orders...</Text>
+                        <Text style={styles.emptyLabel}>Stay in a busy area to get requests faster.</Text>
+                    </View>
+                ) : (
+                    requests.map(req => (
+                        <View key={req.id} style={styles.requestCard}>
+                            <View style={styles.reqTop}>
+                                <Text style={styles.reqTitle}>New Delivery Request</Text>
+                                <Text style={styles.reqFee}>+ Rs {req.earnings}</Text>
+                            </View>
+
+                            <View style={styles.routeContainer}>
+                                <View style={styles.routePoint}>
+                                    <View style={styles.routeDot} />
+                                    <Text style={styles.routeText} numberOfLines={1}>
+                                        <Text style={{ fontWeight: 'bold' }}>Pickup:</Text> {req.shopName}
+                                    </Text>
+                                </View>
+                                <View style={styles.routeLine} />
+                                <View style={styles.routePoint}>
+                                    <View style={[styles.routeDot, { backgroundColor: Colors.accent }]} />
+                                    <Text style={styles.routeText} numberOfLines={1}>
+                                        <Text style={{ fontWeight: 'bold' }}>Dropoff:</Text> {req.deliveryAddress}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.reqMeta}>
+                                <Text style={styles.metaBadge}>📍 {req.distance} away</Text>
+                                <Text style={styles.metaBadge}>📦 {req.itemCount} items</Text>
+                            </View>
+
+                            <View style={styles.reqActions}>
+                                <TouchableOpacity
+                                    style={[styles.actionBtn, styles.declineBtn]}
+                                    onPress={() => handleDecline(req.id)}
+                                >
+                                    <Text style={styles.declineText}>Decline</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.actionBtn, styles.acceptBtn]}
+                                    onPress={() => handleAccept(req.id)}
+                                >
+                                    <Text style={styles.acceptText}>Accept</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ))
                 )}
             </ScrollView>
-
-            {/* Delivery Request Popup */}
-            {showRequest && (
-                <View style={styles.requestOverlay}>
-                    <View style={styles.requestCard}>
-                        <Text style={styles.requestTitle}>🔔 {t('rider.newOrder')}</Text>
-
-                        <View style={styles.requestInfo}>
-                            <View style={styles.requestRow}>
-                                <Text style={styles.requestLabel}>{t('rider.pickup')}:</Text>
-                                <Text style={styles.requestValue}>{request.shopName}</Text>
-                            </View>
-                            <Text style={styles.requestAddress}>{request.shopAddress}</Text>
-
-                            <View style={styles.requestDivider} />
-
-                            <View style={styles.requestRow}>
-                                <Text style={styles.requestLabel}>{t('rider.deliverTo')}:</Text>
-                                <Text style={styles.requestValue}>{request.deliveryAddress}</Text>
-                            </View>
-                            <Text style={styles.requestAddress}>{request.deliveryLandmark}</Text>
-                        </View>
-
-                        <View style={styles.requestMeta}>
-                            <Text style={styles.requestMetaItem}>📦 {request.itemCount} items</Text>
-                            <Text style={styles.requestMetaItem}>📍 {request.distance}</Text>
-                        </View>
-
-                        <View style={styles.requestEarnings}>
-                            <Text style={styles.earnLabel}>{t('rider.earn')}:</Text>
-                            <Text style={styles.earnValue}>PKR {request.earnings}</Text>
-                        </View>
-
-                        {/* Timer */}
-                        <View style={styles.timerWrap}>
-                            <Text style={styles.timerText}>{t('rider.acceptIn')} {timeLeft}s</Text>
-                            <View style={styles.timerBar}>
-                                <View
-                                    style={[
-                                        styles.timerFill,
-                                        { width: `${(timeLeft / 30) * 100}%` },
-                                    ]}
-                                />
-                            </View>
-                        </View>
-
-                        <View style={styles.requestActions}>
-                            <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept}>
-                                <Text style={styles.acceptBtnText}>✅ {t('rider.accept')}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
-                                <Text style={styles.skipBtnText}>⏭️ {t('rider.skip')}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            )}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: Colors.snow,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingTop: 54,
-        paddingBottom: Spacing.lg,
-        paddingHorizontal: Spacing.xl,
-    },
-    headerTitle: {
-        ...Typography.h2,
-        color: Colors.white,
-    },
-    headerRating: {
-        ...Typography.label,
-        color: Colors.warm,
-    },
-    body: {
-        padding: Spacing.xl,
-        paddingBottom: 100,
-    },
-    earningsCard: {
-        backgroundColor: Colors.white,
-        padding: Spacing.xl,
-        borderRadius: Radius.lg,
-        alignItems: 'center',
-        shadowColor: Colors.cardShadow,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 1,
-        shadowRadius: 16,
-        elevation: 4,
-        marginBottom: Spacing.lg,
-    },
-    earningsLabel: {
-        ...Typography.label,
-        color: Colors.gray,
-    },
-    earningsValue: {
-        fontSize: 36,
-        fontWeight: '800',
-        color: Colors.primary,
-        marginVertical: Spacing.sm,
-    },
-    deliveryCount: {
-        ...Typography.body,
-        color: Colors.charcoal,
-    },
-    quickStats: {
-        flexDirection: 'row',
-        gap: Spacing.md,
-        marginBottom: Spacing.xl,
-    },
-    statCard: {
-        flex: 1,
-        backgroundColor: Colors.white,
-        padding: Spacing.base,
-        borderRadius: Radius.md,
-        alignItems: 'center',
-        shadowColor: Colors.cardShadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    statValue: {
-        ...Typography.label,
-        color: Colors.primary,
-        marginBottom: 2,
-    },
-    statLabel: {
-        ...Typography.caption,
-        color: Colors.slate,
-    },
-    onlineWrap: {
-        alignItems: 'center',
-        marginVertical: Spacing.xl,
-    },
-    onlineBtn: {
-        width: 160,
-        height: 160,
-        borderRadius: 80,
-        backgroundColor: Colors.ghost,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 4,
-        borderColor: Colors.mist,
-    },
-    onlineBtnActive: {
-        backgroundColor: Colors.primaryFaded,
-        borderColor: Colors.primary,
-    },
-    onlineBtnIcon: {
-        fontSize: 40,
-        marginBottom: Spacing.sm,
-    },
-    onlineBtnText: {
-        ...Typography.label,
-        color: Colors.dark,
-    },
-    waitingBox: {
-        alignItems: 'center',
-        paddingVertical: Spacing.xl,
-    },
-    waitingEmoji: {
-        fontSize: 40,
-        marginBottom: Spacing.sm,
-    },
-    waitingText: {
-        ...Typography.body,
-        color: Colors.slate,
-    },
-    // Request overlay
-    requestOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: Colors.overlay,
-        justifyContent: 'center',
-        padding: Spacing.xl,
-    },
-    requestCard: {
-        backgroundColor: Colors.white,
-        borderRadius: Radius.xl,
-        padding: Spacing.xl,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 24,
-        elevation: 12,
-    },
-    requestTitle: {
-        ...Typography.h2,
-        color: Colors.dark,
-        textAlign: 'center',
-        marginBottom: Spacing.lg,
-    },
-    requestInfo: {
-        backgroundColor: Colors.snow,
-        padding: Spacing.base,
-        borderRadius: Radius.md,
-        marginBottom: Spacing.md,
-    },
-    requestRow: {
-        flexDirection: 'row',
-        gap: Spacing.sm,
-    },
-    requestLabel: {
-        ...Typography.label,
-        color: Colors.gray,
-    },
-    requestValue: {
-        ...Typography.label,
-        color: Colors.dark,
-    },
-    requestAddress: {
-        ...Typography.caption,
-        color: Colors.slate,
-        marginTop: 2,
-        marginBottom: Spacing.sm,
-    },
-    requestDivider: {
-        height: 1,
-        backgroundColor: Colors.mist,
-        marginVertical: Spacing.sm,
-    },
-    requestMeta: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: Spacing.md,
-    },
-    requestMetaItem: {
-        ...Typography.label,
-        color: Colors.charcoal,
-    },
-    requestEarnings: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: Spacing.sm,
-        backgroundColor: Colors.successFaded,
-        padding: Spacing.md,
-        borderRadius: Radius.md,
-        marginBottom: Spacing.lg,
-    },
-    earnLabel: {
-        ...Typography.body,
-        color: Colors.charcoal,
-    },
-    earnValue: {
-        ...Typography.h3,
-        color: Colors.primary,
-    },
-    timerWrap: {
-        marginBottom: Spacing.lg,
-    },
-    timerText: {
-        ...Typography.labelSmall,
-        color: Colors.slate,
-        textAlign: 'center',
-        marginBottom: Spacing.sm,
-    },
-    timerBar: {
-        height: 6,
-        backgroundColor: Colors.ghost,
-        borderRadius: 3,
-        overflow: 'hidden',
-    },
-    timerFill: {
-        height: '100%',
-        backgroundColor: Colors.primary,
-        borderRadius: 3,
-    },
-    requestActions: {
-        flexDirection: 'row',
-        gap: Spacing.md,
-    },
-    acceptBtn: {
-        flex: 2,
-        backgroundColor: Colors.primary,
-        paddingVertical: Spacing.md,
-        borderRadius: Radius.xl,
-        alignItems: 'center',
-    },
-    acceptBtnText: {
-        ...Typography.button,
-        color: Colors.white,
-    },
-    skipBtn: {
-        flex: 1,
-        backgroundColor: Colors.ghost,
-        paddingVertical: Spacing.md,
-        borderRadius: Radius.xl,
-        alignItems: 'center',
-    },
-    skipBtnText: {
-        ...Typography.button,
-        color: Colors.gray,
-    },
+    container: { flex: 1, backgroundColor: Colors.snow },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 60, paddingBottom: Spacing.md, paddingHorizontal: Spacing.xl, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.ghost },
+    greeting: { ...Typography.h2, color: Colors.dark },
+    statusText: { ...Typography.label, marginTop: 4, color: Colors.gray },
+    online: { color: Colors.primary, fontWeight: 'bold' },
+    offline: { color: Colors.slate, fontWeight: 'bold' },
+    body: { padding: Spacing.xl, paddingBottom: 100 },
+    statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginBottom: Spacing.xxl },
+    statCard: { width: '47%', backgroundColor: Colors.white, padding: Spacing.lg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.mist },
+    statIcon: { fontSize: 24, marginBottom: Spacing.sm },
+    statValue: { ...Typography.h3, color: Colors.dark },
+    statLabel: { ...Typography.caption, color: Colors.gray, marginTop: 2 },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },
+    sectionTitle: { ...Typography.h3, color: Colors.charcoal },
+    emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, backgroundColor: Colors.white, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.mist },
+    emptyIcon: { fontSize: 48, marginBottom: Spacing.md },
+    emptyTitle: { ...Typography.label, color: Colors.dark },
+    emptyLabel: { ...Typography.caption, color: Colors.gray, marginTop: 4 },
+    requestCard: { backgroundColor: Colors.white, borderRadius: Radius.lg, padding: Spacing.lg, marginBottom: Spacing.md, borderWidth: 2, borderColor: Colors.primaryFaded, shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
+    reqTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
+    reqTitle: { ...Typography.label, color: Colors.dark },
+    reqFee: { ...Typography.h3, color: Colors.primary },
+    routeContainer: { paddingLeft: Spacing.sm, marginBottom: Spacing.md },
+    routePoint: { flexDirection: 'row', alignItems: 'center' },
+    routeDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary, marginRight: Spacing.md },
+    routeLine: { width: 2, height: 20, backgroundColor: Colors.mist, marginLeft: 4, marginVertical: 2 },
+    routeText: { ...Typography.body, color: Colors.dark, flex: 1 },
+    reqMeta: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg, paddingBottom: Spacing.lg, borderBottomWidth: 1, borderBottomColor: Colors.ghost },
+    metaBadge: { backgroundColor: Colors.ghost, paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.sm, ...Typography.caption, color: Colors.gray },
+    reqActions: { flexDirection: 'row', gap: Spacing.md },
+    actionBtn: { flex: 1, paddingVertical: Spacing.md, alignItems: 'center', borderRadius: Radius.md },
+    declineBtn: { backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.mist },
+    declineText: { ...Typography.button, color: Colors.gray },
+    acceptBtn: { backgroundColor: Colors.primary },
+    acceptText: { ...Typography.button, color: Colors.white },
 });

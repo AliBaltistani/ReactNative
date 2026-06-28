@@ -1,0 +1,22 @@
+﻿src/screens/common/ProfileScreen.tsx(55,77): error TS2554: Expected 1 arguments, but got 2.
+src/screens/common/ProfileScreen.tsx(69,83): error TS2554: Expected 1 arguments, but got 2.
+src/screens/common/ProfileScreen.tsx(83,73): error TS2554: Expected 1 arguments, but got 2.
+src/screens/common/ProfileScreen.tsx(157,83): error TS2554: Expected 1 arguments, but got 2.
+src/screens/customer/CartScreen.tsx(272,21): error TS2304: Cannot find name 'Platform'.
+src/screens/customer/CartScreen.tsx(469,24): error TS2304: Cannot find name 'Platform'.
+src/screens/customer/OrdersScreen.tsx(41,72): error TS2554: Expected 1 arguments, but got 2.
+src/screens/customer/OrdersScreen.tsx(52,49): error TS2554: Expected 1 arguments, but got 2.
+src/screens/customer/OrdersScreen.tsx(60,47): error TS2554: Expected 1 arguments, but got 2.
+src/screens/customer/TrackingScreen.tsx(13,43): error TS2307: Cannot find module 'react-native-maps' or its corresponding type declarations.
+src/screens/customer/TrackingScreen.tsx(94,35): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/screens/customer/TrackingScreen.tsx(120,84): error TS2554: Expected 1 arguments, but got 2.
+src/screens/rider/RiderHomeScreen.tsx(150,71): error TS2339: Property 'deliveryFee' does not exist on type 'DeliveryRequest'.
+src/screens/rider/RiderHomeScreen.tsx(164,99): error TS2339: Property 'deliveryLocation' does not exist on type 'DeliveryRequest'.
+src/screens/rider/RiderHomeScreen.tsx(171,72): error TS2339: Property 'totalItems' does not exist on type 'DeliveryRequest'.
+src/screens/seller/SellerDashboard.tsx(102,63): error TS2339: Property 'pendingOrders' does not exist on type 'SellerStats'.
+src/screens/seller/SellerDashboard.tsx(110,67): error TS2339: Property 'revenue' does not exist on type 'SellerStats'.
+src/screens/seller/SellerDashboard.tsx(133,71): error TS2339: Property 'timeAgo' does not exist on type 'SellerOrder'.
+src/screens/seller/SellerDashboard.tsx(140,77): error TS2339: Property 'productName' does not exist on type '{ name: string; quantity: number; price: number; }'.
+src/screens/seller/SellerDashboard.tsx(148,34): error TS2367: This comparison appears to be unintentional because the types '"preparing" | "picked_up" | "new" | "accepted" | "ready"' and '"pending"' have no overlap.
+src/store/settingsStore.ts(53,13): error TS2353: Object literal may only specify known properties, and 'onRehydrate' does not exist in type 'PersistOptions<SettingsState, unknown, unknown>'.
+src/store/settingsStore.ts(54,25): error TS7006: Parameter 'state' implicitly has an 'any' type.

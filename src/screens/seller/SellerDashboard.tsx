@@ -6,11 +6,13 @@ import {
     ScrollView,
     TouchableOpacity,
     Switch,
+    Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
 import { t } from '../../i18n';
 import { MOCK_SELLER_STATS, MOCK_SELLER_ORDERS } from '../../data/mockData';
+import type { SellerOrder } from '../../types';
 
 interface SellerDashboardProps {
     navigation: any;
@@ -19,7 +21,18 @@ interface SellerDashboardProps {
 export default function SellerDashboard({ navigation }: SellerDashboardProps) {
     const [isOpen, setIsOpen] = useState(true);
     const stats = MOCK_SELLER_STATS;
-    const orders = MOCK_SELLER_ORDERS;
+    const [orders, setOrders] = useState<SellerOrder[]>(MOCK_SELLER_ORDERS);
+
+    const updateOrderStatus = (id: string, newStatus: SellerOrder['status']) => {
+        setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus } : o));
+    };
+
+    const rejectOrder = (id: string) => {
+        Alert.alert('Reject Order', 'Are you sure?', [
+            { text: 'No' },
+            { text: 'Yes', style: 'destructive', onPress: () => setOrders(orders.filter(o => o.id !== id)) },
+        ]);
+    };
 
     const getStatusStyle = (status: string) => {
         switch (status) {
@@ -99,17 +112,17 @@ export default function SellerDashboard({ navigation }: SellerDashboardProps) {
 
                                 {order.status === 'new' && (
                                     <View style={styles.orderActions}>
-                                        <TouchableOpacity style={styles.acceptBtn}>
+                                        <TouchableOpacity style={styles.acceptBtn} onPress={() => updateOrderStatus(order.id, 'preparing')}>
                                             <Text style={styles.acceptBtnText}>✅ {t('seller.acceptOrder')}</Text>
                                         </TouchableOpacity>
-                                        <TouchableOpacity style={styles.rejectBtn}>
+                                        <TouchableOpacity style={styles.rejectBtn} onPress={() => rejectOrder(order.id)}>
                                             <Text style={styles.rejectBtnText}>❌ {t('seller.rejectOrder')}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 )}
 
                                 {order.status === 'preparing' && (
-                                    <TouchableOpacity style={styles.readyBtn}>
+                                    <TouchableOpacity style={styles.readyBtn} onPress={() => updateOrderStatus(order.id, 'ready')}>
                                         <Text style={styles.readyBtnText}>📦 {t('seller.ready')}</Text>
                                     </TouchableOpacity>
                                 )}
@@ -119,7 +132,7 @@ export default function SellerDashboard({ navigation }: SellerDashboardProps) {
                 </View>
 
                 {/* Add Item */}
-                <TouchableOpacity style={styles.addItemBtn}>
+                <TouchableOpacity style={styles.addItemBtn} onPress={() => navigation.navigate('SellerItems')}>
                     <Text style={styles.addItemIcon}>➕</Text>
                     <Text style={styles.addItemText}>{t('seller.addItem')}</Text>
                 </TouchableOpacity>

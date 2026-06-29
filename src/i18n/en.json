@@ -15,7 +15,10 @@
         "yes": "Yes",
         "no": "No",
         "ok": "OK",
-        "pkr": "PKR"
+        "pkr": "PKR",
+        "delete": "Delete",
+        "edit": "Edit",
+        "add": "Add"
     },
     "greeting": {
         "hello": "Assalam o Alaikum! 👋",
@@ -35,7 +38,15 @@
         "selectLanguage": "Select Language",
         "loginSubtitle": "Your number stays private with us",
         "familySubtitle": "One account, whole family uses",
-        "guestSubtitle": "Order without registration"
+        "guestSubtitle": "Order without registration",
+        "familyHead": "Family Head",
+        "familyMembers": "Family Members",
+        "addMember": "Add Family Member",
+        "memberName": "Member Name",
+        "accessLevel": "Access Level",
+        "ordersOnly": "Orders Only",
+        "ordersSell": "Orders + Sell",
+        "ordersRide": "Orders + Ride"
     },
     "categories": {
         "grocery": "Grocery",
@@ -125,7 +136,18 @@
         "monthly": "Monthly",
         "totalEarned": "Total Earned",
         "becomeRider": "Become a Rider",
-        "riderApply": "Start earning today!"
+        "riderApply": "Start earning today!",
+        "activeDelivery": "Active Delivery",
+        "headingToShop": "Heading to Shop",
+        "atShop": "At Shop — Pick Up Items",
+        "headingToCustomer": "Heading to Customer",
+        "arrivedAtShop": "Arrived at Shop",
+        "startedDelivery": "Started Delivery",
+        "payoutMethod": "Payout Method",
+        "nextPayout": "Next Payout",
+        "pendingAmount": "Pending Amount",
+        "recentTransactions": "Recent Transactions",
+        "perDelivery": "Per Delivery"
     },
     "seller": {
         "dashboard": "Shop Dashboard",
@@ -142,7 +164,33 @@
         "acceptOrder": "Accept",
         "rejectOrder": "Reject",
         "preparing": "Preparing...",
-        "ready": "Ready for Pickup"
+        "ready": "Ready for Pickup",
+        "noOrders": "No orders",
+        "startPreparing": "Start Preparing",
+        "itemCategory": "Category",
+        "itemUnit": "Unit",
+        "inStock": "In Stock",
+        "deleteItem": "Delete Item"
+    },
+    "settings": {
+        "title": "Settings",
+        "language": "Language",
+        "privacy": "Privacy Settings",
+        "notifications": "Notifications",
+        "anonymousDefault": "Anonymous mode by default",
+        "anonymousDefaultHint": "New orders auto-enable Parda Mode",
+        "leaveAtDoor": "Leave at door",
+        "leaveAtDoorHint": "Default delivery preference",
+        "maskedCalling": "Masked calling",
+        "maskedCallingHint": "Always hide your number from rider",
+        "orderUpdates": "Order updates",
+        "orderUpdatesHint": "Status changes, delivery alerts",
+        "promotions": "Promotions",
+        "promotionsHint": "Deals and offers",
+        "sounds": "Sounds",
+        "soundsHint": "Notification sounds",
+        "version": "Version",
+        "madeWith": "Made with ❤️ in Skardu"
     },
     "profile": {
         "title": "Profile",

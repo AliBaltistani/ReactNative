@@ -15,7 +15,10 @@
         "yes": "ہاں",
         "no": "نہیں",
         "ok": "ٹھیک",
-        "pkr": "روپے"
+        "pkr": "روپے",
+        "delete": "حذف کریں",
+        "edit": "ترمیم",
+        "add": "شامل کریں"
     },
     "greeting": {
         "hello": "!السلام و علیکم 👋",
@@ -35,7 +38,15 @@
         "selectLanguage": "زبان منتخب کریں",
         "loginSubtitle": "آپ کا نمبر ہمارے پاس محفوظ ہے",
         "familySubtitle": "ایک اکاؤنٹ، پوری فیملی استعمال کرے",
-        "guestSubtitle": "بغیر رجسٹریشن آرڈر کریں"
+        "guestSubtitle": "بغیر رجسٹریشن آرڈر کریں",
+        "familyHead": "سربراہ خاندان",
+        "familyMembers": "خاندان کے ارکان",
+        "addMember": "رکن شامل کریں",
+        "memberName": "رکن کا نام",
+        "accessLevel": "رسائی کی سطح",
+        "ordersOnly": "صرف آرڈر",
+        "ordersSell": "آرڈر + فروخت",
+        "ordersRide": "آرڈر + سواری"
     },
     "categories": {
         "grocery": "گروسری",
@@ -125,7 +136,18 @@
         "monthly": "ماہانہ",
         "totalEarned": "کل کمائی",
         "becomeRider": "رائیڈر بنیں",
-        "riderApply": "!آج سے کمانا شروع کریں"
+        "riderApply": "!آج سے کمانا شروع کریں",
+        "activeDelivery": "فعال ڈلیوری",
+        "headingToShop": "دکان کی طرف جا رہے ہیں",
+        "atShop": "دکان پر — سامان اٹھائیں",
+        "headingToCustomer": "گاہک کی طرف جا رہے ہیں",
+        "arrivedAtShop": "دکان پر پہنچ گئے",
+        "startedDelivery": "ڈلیوری شروع ہوئی",
+        "payoutMethod": "ادائیگی کا طریقہ",
+        "nextPayout": "اگلی ادائیگی",
+        "pendingAmount": "زیر التوا رقم",
+        "recentTransactions": "حالیہ لین دین",
+        "perDelivery": "فی ڈلیوری"
     },
     "seller": {
         "dashboard": "دکان ڈیش بورڈ",
@@ -142,7 +164,33 @@
         "acceptOrder": "قبول",
         "rejectOrder": "مسترد",
         "preparing": "..تیار ہو رہا ہے",
-        "ready": "تیار ہے"
+        "ready": "تیار ہے",
+        "noOrders": "کوئی آرڈر نہیں",
+        "startPreparing": "تیاری شروع کریں",
+        "itemCategory": "زمرہ",
+        "itemUnit": "اکائی",
+        "inStock": "دستیاب ہے",
+        "deleteItem": "شے حذف کریں"
+    },
+    "settings": {
+        "title": "سیٹنگز",
+        "language": "زبان",
+        "privacy": "رازداری",
+        "notifications": "اطلاعات",
+        "anonymousDefault": "گمنام موڈ بطور ڈیفالٹ",
+        "anonymousDefaultHint": "نئے آرڈرز خود بخود پردہ موڈ فعال کریں",
+        "leaveAtDoor": "دروازے پر چھوڑ دیں",
+        "leaveAtDoorHint": "ڈیفالٹ ڈلیوری ترجیح",
+        "maskedCalling": "نقاب پوش کالنگ",
+        "maskedCallingHint": "رائیڈر سے نمبر ہمیشہ چھپائیں",
+        "orderUpdates": "آرڈر اپڈیٹس",
+        "orderUpdatesHint": "اسٹیٹس تبدیلی، ڈلیوری الرٹس",
+        "promotions": "پروموشنز",
+        "promotionsHint": "ڈیلز اور آفرز",
+        "sounds": "آوازیں",
+        "soundsHint": "اطلاعات کی آوازیں",
+        "version": "ورژن",
+        "madeWith": "سکردو میں ❤️ سے بنایا گیا"
     },
     "profile": {
         "title": "پروفائل",

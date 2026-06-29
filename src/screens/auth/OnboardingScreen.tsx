@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
-import { t } from '../../i18n';
+import { t, setLanguage, getLanguage } from '../../i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -47,6 +47,7 @@ interface OnboardingScreenProps {
 
 export default function OnboardingScreen({ navigation }: OnboardingScreenProps) {
     const [activeIndex, setActiveIndex] = useState(0);
+    const [lang, setLang] = useState(getLanguage());
     const flatListRef = useRef<FlatList>(null);
 
     const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
@@ -108,11 +109,17 @@ export default function OnboardingScreen({ navigation }: OnboardingScreenProps) 
 
                 <View style={styles.languageRow}>
                     <Text style={styles.langLabel}>{t('auth.selectLanguage')}:</Text>
-                    <TouchableOpacity style={[styles.langBtn, styles.langBtnActive]}>
-                        <Text style={[styles.langBtnText, styles.langBtnTextActive]}>English</Text>
+                    <TouchableOpacity
+                        style={[styles.langBtn, lang === 'en' && styles.langBtnActive]}
+                        onPress={() => { setLanguage('en'); setLang('en'); }}
+                    >
+                        <Text style={[styles.langBtnText, lang === 'en' && styles.langBtnTextActive]}>English</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.langBtn}>
-                        <Text style={styles.langBtnText}>اردو</Text>
+                    <TouchableOpacity
+                        style={[styles.langBtn, lang === 'ur' && styles.langBtnActive]}
+                        onPress={() => { setLanguage('ur'); setLang('ur'); }}
+                    >
+                        <Text style={[styles.langBtnText, lang === 'ur' && styles.langBtnTextActive]}>اردو</Text>
                     </TouchableOpacity>
                 </View>
             </View>

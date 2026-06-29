@@ -16,11 +16,11 @@ interface ProfileScreenProps {
 
 export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     const menuItems = [
-        { icon: '👤', label: t('profile.editProfile'), screen: null },
-        { icon: '📍', label: t('profile.myAddresses'), screen: null },
-        { icon: '🌐', label: t('profile.language'), screen: null },
-        { icon: '🔒', label: t('profile.privacySettings'), screen: null },
-        { icon: '🔔', label: t('profile.notifications'), screen: null },
+        { icon: '👤', label: t('profile.editProfile'), screen: 'Settings' },
+        { icon: '👨‍👩‍👧', label: t('auth.familyAccount'), screen: 'FamilyAccount' },
+        { icon: '🌐', label: t('profile.language'), screen: 'Settings' },
+        { icon: '🔒', label: t('profile.privacySettings'), screen: 'Settings' },
+        { icon: '🔔', label: t('profile.notifications'), screen: 'Settings' },
         { icon: '❓', label: t('profile.help'), screen: null },
         { icon: 'ℹ️', label: t('profile.about'), screen: null },
     ];
@@ -76,7 +76,11 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 {/* Menu Items */}
                 <View style={styles.menuSection}>
                     {menuItems.map((item, i) => (
-                        <TouchableOpacity key={i} style={styles.menuItem}>
+                        <TouchableOpacity
+                            key={i}
+                            style={styles.menuItem}
+                            onPress={() => item.screen && navigation.navigate(item.screen)}
+                        >
                             <Text style={styles.menuIcon}>{item.icon}</Text>
                             <Text style={styles.menuLabel}>{item.label}</Text>
                             <Text style={styles.menuArrow}>→</Text>

@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     ScrollView,
     Animated,
+    Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, Radius, Typography } from '../../theme';
@@ -62,11 +63,13 @@ export default function RiderHomeScreen({ navigation }: RiderHomeScreenProps) {
     const handleAccept = () => {
         setShowRequest(false);
         setTimeLeft(30);
+        navigation.navigate('RiderDelivery', { deliveryId: request.id });
     };
 
     const handleSkip = () => {
         setShowRequest(false);
         setTimeLeft(30);
+        Alert.alert('Skipped', 'Order skipped. Waiting for next order...');
     };
 
     return (

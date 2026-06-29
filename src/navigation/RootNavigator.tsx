@@ -8,6 +8,7 @@ import { Colors, Typography } from '../theme';
 // Auth
 import OnboardingScreen from '../screens/auth/OnboardingScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
+import FamilyAccountScreen from '../screens/auth/FamilyAccountScreen';
 
 // Customer
 import HomeScreen from '../screens/customer/HomeScreen';
@@ -18,12 +19,18 @@ import OrdersScreen from '../screens/customer/OrdersScreen';
 
 // Rider
 import RiderHomeScreen from '../screens/rider/RiderHomeScreen';
+import RiderEarningsScreen from '../screens/rider/RiderEarningsScreen';
+import RiderDeliveryScreen from '../screens/rider/RiderDeliveryScreen';
+import RiderOrderAlertScreen from '../screens/rider/RiderOrderAlertScreen';
 
 // Seller
 import SellerDashboard from '../screens/seller/SellerDashboard';
+import SellerItemManager from '../screens/seller/SellerItemManager';
+import SellerOrdersScreen from '../screens/seller/SellerOrdersScreen';
 
 // Common
 import ProfileScreen from '../screens/common/ProfileScreen';
+import SettingsScreen from '../screens/common/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -39,29 +46,11 @@ function TabIcon({ emoji, label, focused }: { emoji: string; label: string; focu
 }
 
 const tabStyles = StyleSheet.create({
-    iconWrap: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: 6,
-    },
-    emoji: {
-        fontSize: 22,
-        opacity: 0.5,
-    },
-    emojiFocused: {
-        opacity: 1,
-        fontSize: 24,
-    },
-    label: {
-        ...Typography.caption,
-        color: Colors.slate,
-        marginTop: 2,
-        fontSize: 10,
-    },
-    labelFocused: {
-        color: Colors.primary,
-        fontWeight: '700',
-    },
+    iconWrap: { alignItems: 'center', justifyContent: 'center', paddingTop: 6 },
+    emoji: { fontSize: 22, opacity: 0.5 },
+    emojiFocused: { opacity: 1, fontSize: 24 },
+    label: { ...Typography.caption, color: Colors.slate, marginTop: 2, fontSize: 10 },
+    labelFocused: { color: Colors.primary, fontWeight: '700' },
 });
 
 // ─── Customer Tab Navigator ─────────────────────────────────
@@ -71,47 +60,22 @@ function CustomerTabs() {
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    backgroundColor: Colors.white,
-                    borderTopColor: Colors.ghost,
-                    height: 70,
-                    paddingBottom: 10,
-                    elevation: 12,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: -4 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 12,
+                    backgroundColor: Colors.white, borderTopColor: Colors.ghost,
+                    height: 70, paddingBottom: 10, elevation: 12,
+                    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
+                    shadowOpacity: 0.08, shadowRadius: 12,
                 },
                 tabBarShowLabel: false,
             }}
         >
-            <Tab.Screen
-                name="Home"
-                component={HomeScreen}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="Home" focused={focused} />,
-                }}
-            />
-            <Tab.Screen
-                name="Search"
-                component={HomeScreen}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" label="Search" focused={focused} />,
-                }}
-            />
-            <Tab.Screen
-                name="OrdersTab"
-                component={OrdersScreen}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="📋" label="Orders" focused={focused} />,
-                }}
-            />
-            <Tab.Screen
-                name="ProfileTab"
-                component={ProfileScreen}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="👤" label="Profile" focused={focused} />,
-                }}
-            />
+            <Tab.Screen name="Home" component={HomeScreen}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="Home" focused={focused} /> }} />
+            <Tab.Screen name="Search" component={HomeScreen}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" label="Search" focused={focused} /> }} />
+            <Tab.Screen name="OrdersTab" component={OrdersScreen}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📋" label="Orders" focused={focused} /> }} />
+            <Tab.Screen name="ProfileTab" component={ProfileScreen}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="👤" label="Profile" focused={focused} /> }} />
         </Tab.Navigator>
     );
 }
@@ -123,43 +87,20 @@ function RiderTabs() {
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    backgroundColor: Colors.dark,
-                    borderTopColor: Colors.charcoal,
-                    height: 70,
-                    paddingBottom: 10,
-                    elevation: 12,
+                    backgroundColor: Colors.dark, borderTopColor: Colors.charcoal,
+                    height: 70, paddingBottom: 10, elevation: 12,
                 },
                 tabBarShowLabel: false,
             }}
         >
-            <Tab.Screen
-                name="RiderHome"
-                component={RiderHomeScreen}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="Home" focused={focused} />,
-                }}
-            />
-            <Tab.Screen
-                name="RiderOrders"
-                component={OrdersScreen}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="📋" label="Orders" focused={focused} />,
-                }}
-            />
-            <Tab.Screen
-                name="RiderEarnings"
-                component={RiderHomeScreen}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="💰" label="Earnings" focused={focused} />,
-                }}
-            />
-            <Tab.Screen
-                name="RiderProfile"
-                component={ProfileScreen}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="👤" label="Profile" focused={focused} />,
-                }}
-            />
+            <Tab.Screen name="RiderHome" component={RiderHomeScreen}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" label="Home" focused={focused} /> }} />
+            <Tab.Screen name="RiderOrders" component={OrdersScreen}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📋" label="Orders" focused={focused} /> }} />
+            <Tab.Screen name="RiderEarnings" component={RiderEarningsScreen}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="💰" label="Earnings" focused={focused} /> }} />
+            <Tab.Screen name="RiderProfile" component={ProfileScreen}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="👤" label="Profile" focused={focused} /> }} />
         </Tab.Navigator>
     );
 }
@@ -171,43 +112,20 @@ function SellerTabs() {
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    backgroundColor: Colors.white,
-                    borderTopColor: Colors.ghost,
-                    height: 70,
-                    paddingBottom: 10,
-                    elevation: 12,
+                    backgroundColor: Colors.white, borderTopColor: Colors.ghost,
+                    height: 70, paddingBottom: 10, elevation: 12,
                 },
                 tabBarShowLabel: false,
             }}
         >
-            <Tab.Screen
-                name="SellerHome"
-                component={SellerDashboard}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="🏪" label="Shop" focused={focused} />,
-                }}
-            />
-            <Tab.Screen
-                name="SellerOrders"
-                component={SellerDashboard}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="📦" label="Orders" focused={focused} />,
-                }}
-            />
-            <Tab.Screen
-                name="SellerItems"
-                component={SellerDashboard}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="📋" label="Items" focused={focused} />,
-                }}
-            />
-            <Tab.Screen
-                name="SellerProfile"
-                component={ProfileScreen}
-                options={{
-                    tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" label="Settings" focused={focused} />,
-                }}
-            />
+            <Tab.Screen name="SellerHome" component={SellerDashboard}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🏪" label="Shop" focused={focused} /> }} />
+            <Tab.Screen name="SellerOrders" component={SellerOrdersScreen}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📦" label="Orders" focused={focused} /> }} />
+            <Tab.Screen name="SellerItems" component={SellerItemManager}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📋" label="Items" focused={focused} /> }} />
+            <Tab.Screen name="SellerProfile" component={ProfileScreen}
+                options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="⚙️" label="Settings" focused={focused} /> }} />
         </Tab.Navigator>
     );
 }
@@ -216,13 +134,11 @@ function SellerTabs() {
 export default function RootNavigator() {
     return (
         <NavigationContainer>
-            <Stack.Navigator
-                screenOptions={{ headerShown: false }}
-                initialRouteName="Onboarding"
-            >
+            <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Onboarding">
                 {/* Auth flow */}
                 <Stack.Screen name="Onboarding" component={OnboardingScreen} />
                 <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="FamilyAccount" component={FamilyAccountScreen} />
 
                 {/* Customer flow */}
                 <Stack.Screen name="CustomerTabs" component={CustomerTabs} />
@@ -233,9 +149,14 @@ export default function RootNavigator() {
 
                 {/* Rider flow */}
                 <Stack.Screen name="RiderTabs" component={RiderTabs} />
+                <Stack.Screen name="RiderDelivery" component={RiderDeliveryScreen} />
+                <Stack.Screen name="RiderOrderAlert" component={RiderOrderAlertScreen} />
 
                 {/* Seller flow */}
                 <Stack.Screen name="SellerTabs" component={SellerTabs} />
+
+                {/* Common */}
+                <Stack.Screen name="Settings" component={SettingsScreen} />
             </Stack.Navigator>
         </NavigationContainer>
     );

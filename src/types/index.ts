@@ -23,6 +23,15 @@ export interface FamilyMember {
     name: string;
     pin: string;
     role: 'order' | 'order_sell' | 'ride';
+    icon: string;
+}
+
+export interface FamilyAccount {
+    id: string;
+    headName: string;
+    headPhone: string;
+    members: FamilyMember[];
+    createdAt: string;
 }
 
 // Category
@@ -119,6 +128,32 @@ export interface DeliveryRequest {
     timeLeft: number;
 }
 
+export interface RiderDelivery {
+    id: string;
+    orderId: string;
+    shopName: string;
+    shopAddress: string;
+    deliveryAddress: string;
+    deliveryLandmark: string;
+    itemCount: number;
+    customerName?: string;
+    isAnonymous: boolean;
+    status: 'heading_to_shop' | 'at_shop' | 'picked_up' | 'heading_to_customer' | 'delivered';
+    earnings: number;
+    distance: string;
+}
+
+export interface EarningEntry {
+    id: string;
+    orderId: string;
+    amount: number;
+    shopName: string;
+    date: string;
+    time: string;
+}
+
+export type EarningsPeriod = 'daily' | 'weekly' | 'monthly';
+
 // Seller
 export interface SellerStats {
     todayOrders: number;
@@ -132,4 +167,34 @@ export interface SellerOrder {
     total: number;
     status: 'new' | 'accepted' | 'preparing' | 'ready' | 'picked_up';
     createdAt: string;
+    customerName?: string;
+    deliveryAddress?: string;
+    isAnonymous?: boolean;
+}
+
+export interface SellerProduct {
+    id: string;
+    name: string;
+    nameUr: string;
+    price: number;
+    image: string;
+    category: string;
+    inStock: boolean;
+    unit?: string;
+    description?: string;
+}
+
+// Privacy & Settings
+export interface PrivacySettings {
+    anonymousByDefault: boolean;
+    leaveAtDoorDefault: boolean;
+    maskedCalling: boolean;
+    shareLocation: boolean;
+}
+
+export interface NotificationSettings {
+    orderUpdates: boolean;
+    promotions: boolean;
+    riderAlerts: boolean;
+    sounds: boolean;
 }
